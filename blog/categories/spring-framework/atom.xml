@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Spring Framework | Queuepy]]></title>
+  <link href="http://queuepy.com/blog/categories/spring-framework/atom.xml" rel="self"/>
+  <link href="http://queuepy.com/"/>
+  <updated>2013-03-05T23:42:02+04:00</updated>
+  <id>http://queuepy.com/</id>
+  <author>
+    <name><![CDATA[Evgenij Kozhevnikov]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Прицельный обзор: Зачем Spring'у proxy объекты]]></title>
+    <link href="http://queuepy.com/blog/2012/07/17/spring-about-proxy/"/>
+    <updated>2012-07-17T00:01:00+04:00</updated>
+    <id>http://queuepy.com/blog/2012/07/17/spring-about-proxy</id>
+    <content type="html"><![CDATA[<p>Как уже стало известно, в основе процесса создания <a href="http://www.springsource.org/spring-framework">Spring</a> бинов лежит <em>CGLib</em> - очень распространенная библиотека для создания классов в режиме реального времени. Ее используют такие библиотеки как <em>Hibernate</em>, <em>iBATIS</em> и <a href="http://cglib.sourceforge.net">многие другие</a>.</p>
+
+<!--more-->
+
+
+<p>Иногда в <em>spring'e</em> появляется необходимость переопределить некоторые методы бина. Типичный случай - разные жизненные циклы связанных бинов. Например, singleton bean должен работать при каждом вызове своих методов с новым экземпляром связанного с ним не singleton бина. В данном случае <em>Spring</em> не сможет обеспечить такую логику, т.к. связанный бин заинжектируется в момент создания singleton бина.</p>
+
+<blockquote><p>В Spring'е есть возможность указать родной для первого бина метод, при вызове которого будет создаваться и возвращаться новый экземпляр связанного бина. Помимо этого есть возможность переопределять методы с помощью <code>MethodReplacer</code>'a. Подробнее <a href="http://static.springsource.org/spring/docs/1.2.x/reference/beans.html#beans-factory-method-injection">здесь</a>.</p></blockquote>
+
+<p>Эти фичи требуют создания proxy объектов бинов, а реализуется все это безобразие с помощью всем известной библиотеки <em>CGLib</em>. После того, как beanFactory определил все метаданные для создания бина и не нашел его в кеше, то он пытается его создать следующим образом:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Object instantiate(RootBeanDefinition beanDefinition, String beanName, BeanFactory owner) {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>if (beanDefinition.getMethodOverrides().isEmpty()) {
+</span><span class='line'>    Constructor&lt;?&gt; constructorToUse;
+</span><span class='line'>    synchronized (beanDefinition.constructorArgumentLock) {
+</span><span class='line'>        constructorToUse = (Constructor&lt;?&gt;) beanDefinition.resolvedConstructorOrFactoryMethod;
+</span><span class='line'>        if (constructorToUse == null) {
+</span><span class='line'>            final Class clazz = beanDefinition.getBeanClass();
+</span><span class='line'>            if (clazz.isInterface()) {
+</span><span class='line'>                throw new BeanInstantiationException(clazz, "Specified class is an interface");
+</span><span class='line'>            }
+</span><span class='line'>            try {
+</span><span class='line'>                if (System.getSecurityManager() != null) {
+</span><span class='line'>                    constructorToUse = AccessController.doPrivileged(new PrivilegedExceptionAction&lt;Constructor&gt;() {
+</span><span class='line'>                        public Constructor run() throws Exception {
+</span><span class='line'>                            return clazz.getDeclaredConstructor((Class[]) null);
+</span><span class='line'>                        }
+</span><span class='line'>                    });
+</span><span class='line'>                }
+</span><span class='line'>                else {
+</span><span class='line'>                    constructorToUse =  clazz.getDeclaredConstructor((Class[]) null);
+</span><span class='line'>                }
+</span><span class='line'>                beanDefinition.resolvedConstructorOrFactoryMethod = constructorToUse;
+</span><span class='line'>            }
+</span><span class='line'>            catch (Exception ex) {
+</span><span class='line'>                throw new BeanInstantiationException(clazz, "No default constructor found", ex);
+</span><span class='line'>            }
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    return BeanUtils.instantiateClass(constructorToUse);
+</span><span class='line'>}
+</span><span class='line'>else {
+</span><span class='line'>    return instantiateWithMethodInjection(beanDefinition, beanName, owner);
+</span><span class='line'>}
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>} &lt;br/></span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>В методе проверяется есть ли в <code>BeanDefinition</code> объекте переопределенные методы. Если нет, то объект просто инстанцируется с помощью <em>reflection</em>'а, иначе вызывается метод <code>instantiateWithMethodInjection</code>, в котором и реализована работа создания proxy объектов бинов через <code>CglibSubclassCreator</code>. <code>SubclassCreator</code> имеет основной метод <code>instantiate</code>:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Object instantiate(Constructor ctor, Object[] args) {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>   Enhancer enhancer = new Enhancer();
+</span><span class='line'>   enhancer.setSuperclass(this.beanDefinition.getBeanClass());
+</span><span class='line'>   enhancer.setCallbackFilter(new CallbackFilterImpl());
+</span><span class='line'>   enhancer.setCallbacks(new Callback[] {
+</span><span class='line'>      NoOp.INSTANCE,
+</span><span class='line'>      new LookupOverrideMethodInterceptor(),
+</span><span class='line'>  new ReplaceOverrideMethodInterceptor()
+</span><span class='line'>   });
+</span><span class='line'>
+</span><span class='line'>   return (ctor == null) ? 
+</span><span class='line'>      enhancer.create() : 
+</span><span class='line'>  enhancer.create(ctor.getParameterTypes(), args);
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>В этом методе создается Enhancer - объект библиотеки CGLib, который конструирует proxy классы. Указывается класс, от которого стоит унаследоваться. В данном случае это класс самого бина. Далее указываются обработчики переопределяемых методов. На данный момент это три вида <code>MethodInterceptor</code>'a:</p>
+
+<ol>
+<li><code>NoOp.INSTANCE</code> - константа библиотеки CGLib, передающая управление реальным методам</li>
+<li><code>LookupOverrideMethodInterceptor</code> оборабатывает методы, возвращающие новые экземпляры бинов.</li>
+<li><code>ReplaceOverrideMethodInterceptor</code> обрабатывает методы, переопределенные с помощью <code>MethodReplacer</code>'a.</li>
+</ol>
+
+
+<p>Оба эти класса объявляены внутри <code>SubclassCreator</code>'а. Метод <code>enhancer.create()</code> конструирует класс и создает экземпляр объекта этого класса.</p>
+
+<p>Стоит заметить, что <code>beanDefintion</code> и <code>beanFactory</code> хранятся в полях <code>SubclassCreator</code>'а, и объявленные в нем классы имеют доступ к ним. Эти поля помечены модификатором final, что гарантирует доступ только на чтение к значениям этих полей.</p>
+
+<p>Объект бина создан и его можно вернуть для инжектирования в клиентскую программу. При вызове методов бинов, созданных с помощью CGLib, передается управление обработчикам методов, которые указаны у proxy объекта. При создании бина были указаны 3 обработчика и <code>CallbackFilter</code>. При добавлении обработчика он получает индекс, как в массиве. <code>CallbackFilter</code> определяет какой из обработчиков выполнится, указывая его индекс. В spring'e создается свой фильтр обработчиков <code>CallbackFilterImpl</code>:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private class CallbackFilterImpl extends CglibIdentitySupport implements CallbackFilter {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>public int accept(Method method) {
+</span><span class='line'>    MethodOverride methodOverride = beanDefinition.getMethodOverrides().getOverride(method);
+</span><span class='line'>    if (logger.isTraceEnabled()) {
+</span><span class='line'>        logger.trace("Override for '" + method.getName() + "' is [" + methodOverride + "]");
+</span><span class='line'>    }
+</span><span class='line'>    if (methodOverride == null) {
+</span><span class='line'>        return PASSTHROUGH;
+</span><span class='line'>    }
+</span><span class='line'>    else if (methodOverride instanceof LookupOverride) {
+</span><span class='line'>        return LOOKUP_OVERRIDE;
+</span><span class='line'>    }
+</span><span class='line'>    else if (methodOverride instanceof ReplaceOverride) {
+</span><span class='line'>        return METHOD_REPLACER;
+</span><span class='line'>    }
+</span><span class='line'>    throw new UnsupportedOperationException(
+</span><span class='line'>            "Unexpected MethodOverride subclass: " + methodOverride.getClass().getName());
+</span><span class='line'>}
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Как можно заметить, переопределяемые методы представляют собой <code>MethodOverride</code> объект, который определяет его имя, имя объекта, которому он принадлежит и другую мета информацию о методе. Но сам по себе этот класс абстрактный, а наследуют его два класса:</p>
+
+<ol>
+<li><code>LookupOverride</code> для объявления порождающих методов</li>
+<li><code>ReplaceOverride</code> для объявления методов, переопределяемых произвольной логикой</li>
+</ol>
+
+
+<p>Определяя тип переопределяемого метода, определяется индекс обработчика. Индекс обработчика задан в виде константы.</p>
+
+<p>При вызове обработчика <code>LookupOverrideMethodInterceptor</code> вызывается создание бина с помощью beanFactory текущего бина по имени, которое задано в LookupOverride. Это имя попадает туда из соответствующей директивы конфигурации бинов:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;lookup-method name="createSingleShotHelper" bean="singleShotHelper"/></span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>При вызове <code>ReplaceOverrideMethodInterceptor</code> получается указанный в <code>ReplaceOverride</code> <code>MethodReplacer</code> и вызывается его основной метод с логикой, куда передается информация о вызванном методе, аргументах и самом объекте. Объект <code>MethodReplacer</code> также определяется в конфигурации директивой:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;replaced-method name="computeValue" replacer="replacementComputeValue"></span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Как видно из строчки конфигурации, задается имя бина <code>MethodReplacer</code>'a. Поэтому в <code>ReplaceOverride</code> объекте хранится просто имя, а при обработке вызова метода данным обработчиком по имени бина получается объект с помощью все той же <code>BeanFactory</code>.</p>
+
+<p>Как видно из данного обзора, подход оперирования именами бинов во всех частях конфигурации в некоторых ситуациях может вызывать достаточно большой overhead при работе с proxy объектами.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Прицельный обзор: Как создаются бины в Spring Framework]]></title>
+    <link href="http://queuepy.com/blog/2012/07/10/spring-creating-beans/"/>
+    <updated>2012-07-10T01:09:00+04:00</updated>
+    <id>http://queuepy.com/blog/2012/07/10/spring-creating-beans</id>
+    <content type="html"><![CDATA[<p>Основной интерфейс - <code>BeanFactory</code>. Основной метод - <code>getBean</code>. Его расширяют такие интерфейсы как:</p>
+
+
+
+
+<ul class="enum">
+    <li><code>ListableBeanFactory</code> для доступа к спискам экземпляров созданных bean'ов</li>
+    <li><code>HierarchicalBeanFactory</code> для организации иерархичных фабрик бинов</li>
+    <li><code>ConfigurableBeanFactory</code> определяет методы, конфигурирующие бины</li>
+</ul>
+
+
+
+
+<!--more-->
+
+
+
+
+<p>Этих интерфейсов бесчисленное множество. По отдельности они практически не используются, а служат для создания больших многофункциональных объектов фабрик. Для инициации загрузки необходим конфигурационный файл. За обработку источников конфигурации бинов отвечают BeanDefinition объекты:</p>
+
+
+
+
+<ul class="enum">
+    <li><code>PropertiesBeanDefinitionReader</code> для конфигурирования бинов в property файлах</li>
+    <li><code>XmlBeanDefinitionReader</code> для конфигурирования бинов с помощью xml</li>
+</ul>
+
+
+
+
+<p>Естественно, наиболее популярен XML BeanDefinition, но очевидно, что скоро и от XML откажутся, как от пережитка прошлого, в пользу <em>Java</em> синтаксиса. Но это будущее, а сейчас вершина <code>FactoryBean</code> иерархии - <code>XmlBeanFactory</code>. Этот объект определяет все специфичные для создания бинов с помощью xml конфигураций реализации, такие как <code>XmlBeanDefinitionReader</code>. Настройки бина, обявленного в конфиге, хранятся в BeanDefinition объекте. Все эти объекты хранятся в реестре бинов - <code>BeanDefinitionRegistry</code>.</p>
+
+
+
+
+<p>Как же строятся бины?</p>
+
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public &lt;T> T getBean(Class&lt;T> requiredType) throws BeansException {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>Assert.notNull(requiredType, "Required type must not be null");
+</span><span class='line'>String[] beanNames = getBeanNamesForType(requiredType);
+</span><span class='line'>if (beanNames.length &gt; 1) {
+</span><span class='line'>    ArrayList&lt;String&gt; autowireCandidates = new ArrayList&lt;String&gt;();
+</span><span class='line'>    for (String beanName : beanNames) {
+</span><span class='line'>        if (getBeanDefinition(beanName).isAutowireCandidate()) {
+</span><span class='line'>            autowireCandidates.add(beanName);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    if (autowireCandidates.size() &gt; 0) {
+</span><span class='line'>        beanNames = autowireCandidates.toArray(new String[autowireCandidates.size()]);
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>if (beanNames.length == 1) {
+</span><span class='line'>    return getBean(beanNames[0], requiredType);
+</span><span class='line'>}
+</span><span class='line'>else if (beanNames.length == 0 &amp;&amp; getParentBeanFactory() != null) {
+</span><span class='line'>    return getParentBeanFactory().getBean(requiredType);
+</span><span class='line'>}
+</span><span class='line'>else {
+</span><span class='line'>    throw new NoSuchBeanDefinitionException(requiredType, "expected single bean but found " +
+</span><span class='line'>            beanNames.length + ": " + StringUtils.arrayToCommaDelimitedString(beanNames));
+</span><span class='line'>}
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Сразу же бросается в глаза некий утилитарный класс <code>Assert</code>, который лишь визуально напоминает конструкцию языка java <code>assert</code>. На этом сходство заканчивается, т.к. внутри все те же стандартные java исключения типа <code>IllegalArgumentException</code>. С помощью метода <code>getBeanNamesForType</code> получается массив всех имен бинов из реестра и отбираются только те, которые соответствуют по типу и другим логическим параметрам, что, к примеру, не позволяет создавать бины из абстрактных классов. Далее, если не нашлось ни одного имени, то пытаемся получить бин из родительской фабрики бинов. <code>parentBeanFactory</code> задается в конструкторе фабрики при её создании. Если имен бинов найдено несколько, то значит конфиг некорректен. И тем не менее пытаемся в данном случае сузить круг поиска только бинами, которые помечены как внедряемые в другие классы.</p>
+
+
+
+
+<p>Теперь, когда у нас есть имя бина и его тип, мы можем попытаться получить экземпляр бина. Метод создания бина достаточно большой (135 строк без сторонних используемых методов), поэтому покажу только кусочки. В первую очередь пытаемся получить объект, если это singleton и он был загружен ранее. Т.к. объект бина может быть фабрикой, то идет проверка на соответствие интерфейсу <code>FactoryBean</code>. Если это действительно фабрика, то вызывается ее фабричный метод.</p>
+
+
+
+
+<p>Порадовала проверка на параллельный запуск создания одного и того же бина в одном потоке. </p>
+
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (isPrototypeCurrentlyInCreation(beanName)) {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>throw new BeanCurrentlyInCreationException(beanName);
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Таким образом предотвращаются циклические ссылки. Статус создания того или иного бина хранится в NamedThreadLocal переменной. </p>
+
+
+
+
+<blockquote>
+Далее идут иерархические хитросплетения, которые сводятся к одному, к библиотке <a href="http://cglib.sourceforge.net/" rel="nofollow">CGLib</a>. С помощью неё создаются бины в spring'e.
+</blockquote>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Прицельный обзор: Как работает Dependency Injection в Spring Framework]]></title>
+    <link href="http://queuepy.com/blog/2012/07/09/spring-di/"/>
+    <updated>2012-07-09T00:37:00+04:00</updated>
+    <id>http://queuepy.com/blog/2012/07/09/spring-di</id>
+    <content type="html"><![CDATA[<p>Для того, чтобы ответить на этот вопрос, нужно определить точку входа. Для начала организуется контекст приложения - вручную для стандартных приложений или автоматически при использовании <em>Spring</em>'а в Web. Сразу хочу отметить, <a href="http://www.springsource.org/spring-framework/" rel="nofollow">Spring Framework</a> отличается высоким уровнем абстракции. Немалая часть реализации организуется путем глубокого наследования (5-6 уровней). Так <code>ApplicationContext</code> компонует в себе общий функционал по работе с состоянием приложения путем реализации нескольких интерфейсов. Затем, делая cast к тому или иному интерфейсу, можно работать с определенным функционалом. К примеру:</p>
+
+
+
+
+<!--more-->
+
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ApplicationContext context = new ClassPathXmlApplicationContext("spring-config.xml");
+</span><span class='line'>BeanFactory beanFactory = context;
+</span><span class='line'>PrintService printService = (PrintService) beanFactory.getBean("printService");
+</span><span class='line'>printService.print();</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Во время создания контекста приложения инициируется его конфигурация, где описываются бины или пакеты, в которых стоит их искать, после чего создаются все связанные компоненты. В терминах Spring'а выполняется refresh контекста. Создается фабрика bean'ов, определяются post processor'ы фабрики. Дело в том, что бины загружаются при старте приложения в память. Они конфигурируются через component-scan директиву в xml или напрямую директивой bean. Все начинается с парсинга конфига с помощью <code>ConfigurationClassPostProcessor</code>'а. Создается парсер конфига <code>ConfigurationClassParser</code> и вызывается его метод <code>parse</code>. Отдельные объекты обрабатывают разные директивы конфига и загружают бины с помощью reflection'а. BeanFactory реализует интерфейс BeanDefinitionRegistry, который описывает структуру объекта для доступа к найденным бинам. Этот объект наполняется через <code>ConfigurationClassParser</code>.</p>
+
+
+
+
+<p>Метод <code>beanFactory.getBean("printService")</code> просто получает экземпляр проинициализированного бина из Map'ы.</p>
+
+
+
+
+<p>DI базируется на трех частях <em>Spring</em>'а - <em>Core</em>, <em>Context</em>, <em>Beans</em>. Куча абстракции, наследования. Используются крупные объекты, реализующие разные функциональные роли. Все это немного усложняет копание в Spring'e. Спасает хороший JavaDoc.</p>
+
+]]></content>
+  </entry>
+  
+</feed>
