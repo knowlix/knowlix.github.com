@@ -1,2 +1,20 @@
-// This File is imported last, and will override other styles in the cascade
-// Add styles here to make changes without digging in too much
+body > nav {
+    h3 {
+        float: left;
+        margin-top: -5px;
+        margin-bottom: 0;
+    }
+    .main-navigation {
+        float: right;
+    }
+}
+
+.maskImage ul.subscription {
+    left: 15px;
+}
+
+article {
+    ol, ul {
+        margin-left: 30px
+    }
+}

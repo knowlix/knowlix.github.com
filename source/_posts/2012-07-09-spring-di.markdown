@@ -1,0 +1,24 @@
+---
+layout: post
+title: "Прицельный обзор: Как работает Dependency Injection в Spring Framework"
+date: 2012-07-09 00:37
+comments: true
+published: true
+categories: [Spring Framework, Sighting review]
+---
+<p>Для того, чтобы ответить на этот вопрос, нужно определить точку входа. Для начала организуется контекст приложения - вручную для стандартных приложений или автоматически при использовании <em>Spring</em>'а в Web. Сразу хочу отметить, <a href="http://www.springsource.org/spring-framework/" rel="nofollow">Spring Framework</a> отличается высоким уровнем абстракции. Немалая часть реализации организуется путем глубокого наследования (5-6 уровней). Так <code>ApplicationContext</code> компонует в себе общий функционал по работе с состоянием приложения путем реализации нескольких интерфейсов. Затем, делая cast к тому или иному интерфейсу, можно работать с определенным функционалом. К примеру:</p>
+
+<!--more-->
+
+{% codeblock %}
+ApplicationContext context = new ClassPathXmlApplicationContext("spring-config.xml");
+BeanFactory beanFactory = context;
+PrintService printService = (PrintService) beanFactory.getBean("printService");
+printService.print();
+{% endcodeblock %}
+
+<p>Во время создания контекста приложения инициируется его конфигурация, где описываются бины или пакеты, в которых стоит их искать, после чего создаются все связанные компоненты. В терминах Spring'а выполняется refresh контекста. Создается фабрика bean'ов, определяются post processor'ы фабрики. Дело в том, что бины загружаются при старте приложения в память. Они конфигурируются через component-scan директиву в xml или напрямую директивой bean. Все начинается с парсинга конфига с помощью <code>ConfigurationClassPostProcessor</code>'а. Создается парсер конфига <code>ConfigurationClassParser</code> и вызывается его метод <code>parse</code>. Отдельные объекты обрабатывают разные директивы конфига и загружают бины с помощью reflection'а. BeanFactory реализует интерфейс BeanDefinitionRegistry, который описывает структуру объекта для доступа к найденным бинам. Этот объект наполняется через <code>ConfigurationClassParser</code>.</p>
+
+<p>Метод <code>beanFactory.getBean("printService")</code> просто получает экземпляр проинициализированного бина из Map'ы.</p>
+
+<p>DI базируется на трех частях <em>Spring</em>'а - <em>Core</em>, <em>Context</em>, <em>Beans</em>. Куча абстракции, наследования. Используются крупные объекты, реализующие разные функциональные роли. Все это немного усложняет копание в Spring'e. Спасает хороший JavaDoc.</p>

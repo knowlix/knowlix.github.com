@@ -1,0 +1,10 @@
+---
+layout: post
+title: "Подкаст: Третий выпуск"
+date: 2012-08-10 22:45
+comments: true
+categories: Podcast
+---
+В две минуты о Netty, Spring Framework и Mockito.
+
+<audio src="{{ root_url }}/podcast/3.mp3" preload="auto" />
