@@ -2,8 +2,8 @@
 #      Main Configs       #
 # ----------------------- #
 
-url: http://queuepy.com
-title: Queuepy
+url: http://knowlix.github.io
+title: CodeInsider
 subtitle: Code Review Open Source проектов.
 author: Evgenij Kozhevnikov
 simple_search: false
