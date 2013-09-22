@@ -1,0 +1,3005 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[CodeInsider]]></title>
+  <link href="http://knowlix.github.io/atom.xml" rel="self"/>
+  <link href="http://knowlix.github.io/"/>
+  <updated>2013-09-22T18:40:47+04:00</updated>
+  <id>http://knowlix.github.io/</id>
+  <author>
+    <name><![CDATA[Code insiders]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Прицельный обзор: OAuth вне браузера через Scribe]]></title>
+    <link href="http://knowlix.github.io/blog/2013/03/03/scribe-oauth-library/"/>
+    <updated>2013-03-03T22:53:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2013/03/03/scribe-oauth-library</id>
+    <content type="html"><![CDATA[<p><a href="https://github.com/fernandezpablo85/scribe-java">Scribe</a> - простая java библиотека, позволяющая проводить авторизацию на сервисах по OAuth протоколу. Библиотека интересна тем, что рекомендуется <a href="https://dev.twitter.com/docs/twitter-libraries#java">twitter&#8217;ом</a> и <a href="https://developer.linkedin.com/documents/libraries-and-tools">linkedin&#8217;ом</a> для работы с их реализациями OAuth аутентификации.</p>
+
+
+
+
+<!--more-->
+
+
+
+
+<p>Библиотека хостится на Github’е, а в качестве CI используется <em>Travis-CI</em>. Кто не знает, <a href="https://github.com/travis-ci/travis-ci">Travis-CI</a> - распределенная система сборки проекта, тесно интегрирующаяся с Github репозиторием.</p>
+
+
+
+
+<p>Build Tool - Maven. Проект реализован в одном модуле.</p>
+
+
+
+
+<p>Проект ведет рядовой разработчик аутсорсинговой компании в южной америке, которая занимается некоторыми задачами разработки LinkedIn’а.</p>
+
+
+
+
+<p>Библиотека удобно оборачивает OAuth протокол для авторизации из java приложения, предлагая весомый набор предустановленных OAuth провайдеров, таких как Twitter, Google, Yahoo. В комплекте идет пакет examples, где показано как работать с каждым из провайдеров.</p>
+
+
+
+
+<p>Все начинается с создания OAuthService объекта:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>OAuthService service = new ServiceBuilder()
+</span><span class='line'>       .provider(TwitterApi.class)
+</span><span class='line'>             .apiKey("6icbcAXyZx67r8uTAUM5Qw")
+</span><span class='line'>             .apiSecret("SCCAdUUc6LXxiazxH3N0QfpNUvlUy84mZ2XZKiv39s")
+</span><span class='line'>             .build();</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Классический Builder-подход, где задается <code>OAuthProvider</code> и данные для аутентификации. Отдельный провайдер отвечает за отдельный сервис. В данном случае - это Twitter. Провайдер ответственен за создание <code>OAuthService’а</code>, который несет в себе специфичную для конкретного сервиса информацию - url, версия OAuth и т.д.</p>
+
+
+
+
+<p>Разработчик грамотно организовал дерево классов. Все провайдеры унаследованы от интерфейса <code>Api</code>, в котором описана сигнатура единственного метода <code>createService</code>. На следующем уровне этот интерфейс расширяют абстрактные классы, специфичные для разных версий OAuth (реализованы обе версии). Конкретные провайдеры наследуют класс, реализующий интерфейс <code>Api</code> с привязкой к версии OAuth протокола  и определяют внутри себя URL для доступа к сервису:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public class FacebookApi extends DefaultApi20
+</span><span class='line'>{
+</span><span class='line'>  private static final String AUTHORIZE_URL = "https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=%s";
+</span><span class='line'>  private static final String SCOPED_AUTHORIZE_URL = AUTHORIZE_URL + "&scope=%s";
+</span><span class='line'>
+</span><span class='line'>  @Override
+</span><span class='line'>  public String getAccessTokenEndpoint()
+</span><span class='line'>  {
+</span><span class='line'>  return "https://graph.facebook.com/oauth/access_token";
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  @Override
+</span><span class='line'>  public String getAuthorizationUrl(OAuthConfig config)
+</span><span class='line'>  {
+</span><span class='line'>  Preconditions.checkValidUrl(config.getCallback(), "Must provide a valid url as callback. Facebook does not support OOB");
+</span><span class='line'>
+</span><span class='line'>  // Append scope if present
+</span><span class='line'>  if(config.hasScope())
+</span><span class='line'>  {
+</span><span class='line'>  return String.format(SCOPED_AUTHORIZE_URL, config.getApiKey(), OAuthEncoder.encode(config.getCallback()), OAuthEncoder.encode(config.getScope()));
+</span><span class='line'>  }
+</span><span class='line'>  else
+</span><span class='line'>  {
+</span><span class='line'>      return String.format(AUTHORIZE_URL, config.getApiKey(), OAuthEncoder.encode(config.getCallback()));
+</span><span class='line'>  }
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Версия OAuth определяет реализацию <code>OAuthService</code> класса, тип запроса (GET, POST) и другие специфичные для версии вещи, например формат данных.</p>
+
+
+
+
+<p>Внутри метода <code>build</code> вызывается метод <code>createService</code> провайдера. После получения <code>OAuthService’а</code> действуем согласно алгоритму работы по OAuth протоколу. Рассмотрим первую версию OAuth. Сначала получем <em>Request Token</em>:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Token requestToken = service.getRequestToken();
+</span><span class='line'>
+</span><span class='line'>  public Token getRequestToken()
+</span><span class='line'>  {
+</span><span class='line'>  config.log("obtaining request token from " + api.getRequestTokenEndpoint());
+</span><span class='line'>  OAuthRequest request = new OAuthRequest(api.getRequestTokenVerb(), api.getRequestTokenEndpoint());
+</span><span class='line'>
+</span><span class='line'>  config.log("setting oauth_callback to " + config.getCallback());
+</span><span class='line'>  request.addOAuthParameter(OAuthConstants.CALLBACK, config.getCallback());
+</span><span class='line'>  addOAuthParams(request, OAuthConstants.EMPTY_TOKEN);
+</span><span class='line'>  appendSignature(request);
+</span><span class='line'>
+</span><span class='line'>  config.log("sending request...");
+</span><span class='line'>  Response response = request.send();
+</span><span class='line'>  String body = response.getBody();
+</span><span class='line'>
+</span><span class='line'>  config.log("response status code: " + response.getCode());
+</span><span class='line'>  config.log("response body: " + body);
+</span><span class='line'>  return api.getRequestTokenExtractor().extract(body);
+</span><span class='line'>  }</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Внутри метода формируется OAuth запрос, данные для которого берутся из Api объекта  провайдера и этот запрос отправляется на сервер. Вся работа с сетью строится на базе стандартного пакета <code>java.net</code>. Таким образом при отправке запроса(<code>request.send()</code>) сначала открывается соединение:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void createConnection() throws IOException
+</span><span class='line'>  {
+</span><span class='line'>  String completeUrl = getCompleteUrl();
+</span><span class='line'>  if (connection == null)
+</span><span class='line'>  {
+</span><span class='line'>      System.setProperty("http.keepAlive", connectionKeepAlive ? "true" : "false");
+</span><span class='line'>      connection = (HttpURLConnection) new URL(completeUrl).openConnection();
+</span><span class='line'>  }
+</span><span class='line'>  }</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Далее добавляются <code>header'ы</code> в запрос и пишется тело сообщения:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>void addHeaders(HttpURLConnection conn)
+</span><span class='line'>  {
+</span><span class='line'>  for (String key : headers.keySet())
+</span><span class='line'>      conn.setRequestProperty(key, headers.get(key));
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  void addBody(HttpURLConnection conn, byte[] content) throws IOException
+</span><span class='line'>  {
+</span><span class='line'>  conn.setRequestProperty(CONTENT_LENGTH, String.valueOf(content.length));
+</span><span class='line'>
+</span><span class='line'>  // Set default content type if none is set.
+</span><span class='line'>  if (conn.getRequestProperty(CONTENT_TYPE) == null)
+</span><span class='line'>  {
+</span><span class='line'>      conn.setRequestProperty(CONTENT_TYPE, DEFAULT_CONTENT_TYPE);
+</span><span class='line'>  }
+</span><span class='line'>  conn.setDoOutput(true);
+</span><span class='line'>  conn.getOutputStream().write(content);
+</span><span class='line'>  }</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>В результате возвращается объект ответа(<code>Response</code>), который в конструкторе принимает данное соединение:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Response(HttpURLConnection connection) throws IOException
+</span><span class='line'>  {
+</span><span class='line'>  try
+</span><span class='line'>  {
+</span><span class='line'>      connection.connect();
+</span><span class='line'>      code = connection.getResponseCode();
+</span><span class='line'>      headers = parseHeaders(connection);
+</span><span class='line'>      stream = isSuccessful() ? connection.getInputStream() : connection.getErrorStream();
+</span><span class='line'>  }
+</span><span class='line'>  catch (UnknownHostException e)
+</span><span class='line'>  {
+</span><span class='line'>      throw new OAuthException("The IP address of a host could not be determined.", e);
+</span><span class='line'>  }
+</span><span class='line'>  }</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Как видно, только в момент инстацирования Response объекта произойдет подключение к удаленному ресурсу. Это ничто иное, как размывание логики приложения. Говоря об архитектурных агрехах, можно еще упоминуть следующий факт - объект запроса использует переменные на уровне класса, которые меняются внутри его публичных методов. В итоге, состояние объекта предсказать невозможно.</p>
+
+
+
+
+<p>На выходе из метода создает объект <code>Token</code>, который заполняется данными ответа. Ответ парсится с помощью регулярных выражений. Даже JSON ответ обрабатывается регулярными выражениями. Объект парсера специфичен для конкретной версии OAuth и хранится в провайдере.</p>
+
+
+
+
+<p>Далее создается объект Verifier, который в конструкторе принимает код подтверждения, выдаваемый сервисом:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Scanner in = new Scanner(System.in);</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>В рамках примера используется командная строка, куда необходимо ввести этот код. Далее вызывается запрос на получение Access Token’а:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Token accessToken = service.getAccessToken(requestToken, verifier);</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Принцип работы аналогичен отправки запроса на Request Token. Отличие лишь в данных, которые пересылаются сервису, в  url получателя и в парсере ответа, который строит объект Token’а:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Token getAccessToken(Token requestToken, Verifier verifier)
+</span><span class='line'>  {
+</span><span class='line'>  config.log("obtaining access token from " + api.getAccessTokenEndpoint());
+</span><span class='line'>  OAuthRequest request = new OAuthRequest(api.getAccessTokenVerb(), api.getAccessTokenEndpoint());
+</span><span class='line'>  request.addOAuthParameter(OAuthConstants.TOKEN, requestToken.getToken());
+</span><span class='line'>  request.addOAuthParameter(OAuthConstants.VERIFIER, verifier.getValue());
+</span><span class='line'>
+</span><span class='line'>  config.log("setting token to: " + requestToken + " and verifier to: " + verifier);
+</span><span class='line'>  addOAuthParams(request, requestToken);
+</span><span class='line'>  appendSignature(request);
+</span><span class='line'>  Response response = request.send();
+</span><span class='line'>  return api.getAccessTokenExtractor().extract(response.getBody());
+</span><span class='line'>  }</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Далее можно осуществлять запросы к защищенному ресурсу сервиса с Token’ом доступа:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>OAuthRequest request = new OAuthRequest(Verb.GET, PROTECTED_RESOURCE_URL);
+</span><span class='line'>service.signRequest(accessToken, request);
+</span><span class='line'>request.addHeader("GData-Version", "3.0");
+</span><span class='line'>Response response = request.send();</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Где метод <code>signRequest</code> добавляет в header запроса токен:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void signRequest(Token token, OAuthRequest request)
+</span><span class='line'>  {
+</span><span class='line'>  config.log("signing request: " + request.getCompleteUrl());
+</span><span class='line'>
+</span><span class='line'>  // Do not append the token if empty. This is for two legged OAuth calls.
+</span><span class='line'>  if (!token.isEmpty())
+</span><span class='line'>  {
+</span><span class='line'>      request.addOAuthParameter(OAuthConstants.TOKEN, token.getToken());
+</span><span class='line'>  }
+</span><span class='line'>  config.log("setting token to: " + token);
+</span><span class='line'>  addOAuthParams(request, token);
+</span><span class='line'>  appendSignature(request);
+</span><span class='line'>  }</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Ну вот и все. Интересно было читать код Scribe. Конечно пришлось пару раз вспомнить заветы товарища Фаулера, но куда без этого?</p>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Netty 4.0: Запуск сервера]]></title>
+    <link href="http://knowlix.github.io/blog/2012/09/09/netty-start-server-4/"/>
+    <updated>2012-09-09T21:52:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/09/09/netty-start-server-4</id>
+    <content type="html"><![CDATA[<p>Сегодня проведем тонкую грань между разными версиями <em>Netty</em> на примере запуска socket сервера. Ранее мы уже рассматривали <a href="http://queuepy.com/blog/2012/08/04/netty-start-server/">запуск сервера на базе Netty 3.5</a>. Сегодня рассмотрим, как этот процесс осуществляется в четвертой ветке <em>Netty</em>.</p>
+
+<!--more-->
+
+
+<p>В качестве отправной точки также, как и ранее будем использовать проект, идущий с исходниками ввиде примера Echo сервера. Стоит сразу сказать, что если в версии 3.5 все исходники делились логически с помощью пакетов, то в новой версии исходники разбиты на модули и все примеры использования Netty находятся в отдельном модуле <code>example</code>.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ServerBootstrap b = new ServerBootstrap();
+</span><span class='line'>try {
+</span><span class='line'>  b.eventLoop(new NioEventLoop(), new NioEventLoop())
+</span><span class='line'>   .channel(new NioServerSocketChannel())
+</span><span class='line'>   .option(ChannelOption.SO_BACKLOG, 100)
+</span><span class='line'>   .localAddress(new InetSocketAddress(port))
+</span><span class='line'>   .childOption(ChannelOption.TCP_NODELAY, true)
+</span><span class='line'>   .handler(new LoggingHandler(LogLevel.INFO))
+</span><span class='line'>   .childHandler(new ChannelInitializer&lt;SocketChannel>() {
+</span><span class='line'>       @Override
+</span><span class='line'>       public void initChannel(SocketChannel ch) throws Exception {
+</span><span class='line'>           ch.pipeline().addLast(
+</span><span class='line'>                   new LoggingHandler(LogLevel.INFO),
+</span><span class='line'>                   new EchoServerHandler());
+</span><span class='line'>       }
+</span><span class='line'>   });
+</span><span class='line'>
+</span><span class='line'>  ChannelFuture f = b.bind().sync();
+</span><span class='line'>
+</span><span class='line'>  f.channel().closeFuture().sync();
+</span><span class='line'>} finally {
+</span><span class='line'>  b.shutdown();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Как и в случае с 3ей версией все начинается с <code>ServerBootstrap</code> - объекта-конфигуратора <em>Netty</em> сервера. Принцип конфигурирования теперь реализован ввиде некого Builder-объекта, где каждый метод-конфигуратор возвращает ссылку на builder до тех пор пока не вызовится метод-строитель. При этом инстанцирование объекта <code>ServerBootstrap</code> отделено от его конфигурирования, т.к. есть только конструктор по-умолчанию (без параметров). Данный подход является более чистым, чем в третьей версии. Там при создании объекта <code>ServerBootstrap</code> необходимо задать фабрику каналов, при этом задание <code>PipelineFactory</code> вынесена в конфигурационный метод. Напомню, что запуск невозможен и без фабрики каналов и без фабрики <code>pipeline'ов</code>. Таким образом есть некая неразбериха. В новом же подходе все объекты задаются на одном уровне, при этом в методе-строителе произведется проверка на корректность сконфигурированных объектов.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Прицельный обзор: Reporter'ы в библиотеке Metrics]]></title>
+    <link href="http://knowlix.github.io/blog/2012/08/24/metrics-reporting/"/>
+    <updated>2012-08-24T00:22:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/08/24/metrics-reporting</id>
+    <content type="html"><![CDATA[<p><a href="https://github.com/codahale/metrics">Metrics</a> - библиотека проведения измерения различных метрик как приложения, так и самого JVM от разработчиков Yammer.</p>
+
+<!--more-->
+
+
+<p>Build tool - Maven с использованием мультимодульности.</p>
+
+<p>Помимо неплохого JavaDoc’а ведется внешняя документация с использованием <a href="http://sphinx.pocoo.org/intro.html">Sphinx</a> - генератора документации на <em>python</em>. Текст документации ведется в <em>reStructuredText</em> разметке. Этот язык разметки сильно упрощен относительно HTML, при этом текст с разметкой не захламлен тегами и читается очень естественно. Сильно напоминает <em>markdown</em>. Документация преобразуется в html посредством генератора из скрипта <em>Makefile</em>.</p>
+
+<p>Основной модуль проекта реализует его архитектуру и основные возможности библиотеки. Остальные модули - это дополнительные возможности, как правило привязанные к конкретным технологиям и библиотекам (например, вывод с помощью log4j или сбор web-ориентированных метрик).</p>
+
+<p>Подход к использованию библиотеки напоминает подход, применяемый в <em>Mockito</em>. Пользователь библиотеки работает с делегатом, как с единой точкой доступа к функционалу библиотеки. Т.е. наружу смотрит класс <code>Metrics</code> либо <code>HealthChecks</code> с набором статичных методов. Реализация этих методов вынесена в отдельный класс, экземпляр которого создается внутри основного класса, например в классе <code>Metrics</code>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private static final MetricsRegistry DEFAULT_REGISTRY = new MetricsRegistry();</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Сам класс <em>Metrics</em> передает управление делегируемому объекту при вызове его методов:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static &lt;T> Gauge&lt;T> newGauge(Class&lt;?> klass,
+</span><span class='line'>                                  String name,
+</span><span class='line'>                                  Gauge&lt;T> metric) {
+</span><span class='line'>  return DEFAULT_REGISTRY.newGauge(klass, name, metric);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Библиотека оперирует несколькими измерительными сущностями:</p>
+
+<p>Метриками:
+1. <code>Gauges</code> для контроля значений используемых объектов
+2. <code>Counters</code> для ведения счетчиков. Используется AtomicLong для подсчета
+3. <code>Meters</code> для измерения скорости работы того или иного компонента
+4. <code>Histograms</code> для измерения статистического распределения значений в потоке данных
+5. <code>Timers</code> для измерения продолжительности и скорости выполнения кода</p>
+
+<p>и <code>HealthChecks</code> для централизованного контроля работоспособности системы.</p>
+
+<p>Прицип работы:</p>
+
+<ol>
+<li>Объявляем метрики</li>
+<li>Указываем точки определения метрик в коде</li>
+<li>Собираем статистику с помощью <code>Reporter’ов</code></li>
+</ol>
+
+
+<p><code>Reporter</code> - объект, который следит за метриками и в случае их появления или изменения оповещает пользователя, доступным reporter’у способом.</p>
+
+<p>Основным <code>Reporter’ом</code> является <code>JMXReporter</code>, который позволяет получать
+результаты измерения в JMX консоли. При загрузке класса <code>Metrics</code>
+<code>JMXReporter</code> подписывается на события регистра метрик, реализуя при
+этом интерфейс слушателя событий регистра метрик.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>static {
+</span><span class='line'>  JmxReporter.startDefault(DEFAULT_REGISTRY);
+</span><span class='line'>  Runtime.getRuntime().addShutdownHook(SHUTDOWN_HOOK);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Тогда же вешается хук на событие завершения приложения, чтобы иметь возможность освободить зарегистрированные MBean’ы JMX сервера. При этом <code>SHUTDOWN_HOOK</code> - это поток, реализующий логику, выполняемую при выключении приложения.</p>
+
+<p>При создании метрики, та попадает в регистр метрик. Регистр метрик оповещает слушателей о добавлении новой метрики. <code>JMXReporter</code> получает по событию добавления ссылку на метрику. При этом <code>JMXReporter</code> описывает внутренние классы MBean’ов для каждого вида метрики, чтобы можно было снимать с них показания через JMX консоль. В конструкторе они получают ссылку на метрику и в случае вызова метода, передают управление конкретной метрики. MBean’ы регистрируются на JMX сервере и готовы к снятию показаний.</p>
+
+<p>Внутри библиотеки реализованы дополнительные <code>reporter’ы</code> для вывода данных в <em>CSV</em> файлы или консоль. Эти reporter’ы сами периодически опрашивают метрики, получая данные из них. Опрос метрик происходит в отдельном потоке, созданный с помощью <code>SingleThreadScheduledExecutor</code>.</p>
+
+<p>В аргументе принимается фабрика потоков, которая пораждает потоки и добавляет их в единую группу, тем самым разделяя потоки, запущенные разными executor’ами. Т.е. запущенные из разных executor’ов потоки не будут иметь прав на доступ к потокам из другой группы. Группа получается из стандартного <code>SecurityManager’а</code>. Потоки являются демонами.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private static class NamedThreadFactory implements ThreadFactory {
+</span><span class='line'>  private final ThreadGroup group;
+</span><span class='line'>  private final AtomicInteger threadNumber = new AtomicInteger(1);
+</span><span class='line'>  private final String namePrefix;
+</span><span class='line'>
+</span><span class='line'>  private NamedThreadFactory(String name) {
+</span><span class='line'>      final SecurityManager s = System.getSecurityManager();
+</span><span class='line'>      this.group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
+</span><span class='line'>      this.namePrefix = "metrics-" + name + "-thread-";
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  @Override
+</span><span class='line'>  public Thread newThread(Runnable r) {
+</span><span class='line'>      final Thread t = new Thread(group, r, namePrefix + threadNumber.getAndIncrement(), 0);
+</span><span class='line'>      t.setDaemon(true);
+</span><span class='line'>      if (t.getPriority() != Thread.NORM_PRIORITY) {
+</span><span class='line'>          t.setPriority(Thread.NORM_PRIORITY);
+</span><span class='line'>      }
+</span><span class='line'>      return t;
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Основной метод снятия показаний с метрик и вывод их в том или ином виде переопределяется в конкретном классе reporter’а. Все метрики зарегистрированны в реестре метрик и любой репортер в момент создания связывается с конкретным реестром. А ссылка на единый реестр метрик хранится в базовых классах <code>Metrics</code> и <code>HealthChecks</code>.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Netty: Управление сообщениями]]></title>
+    <link href="http://knowlix.github.io/blog/2012/08/15/netty-message-management/"/>
+    <updated>2012-08-15T22:37:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/08/15/netty-message-management</id>
+    <content type="html"><![CDATA[<p>После открытия сокета вызывается так называемая регистрация открытого <em>Netty</em> канала, чтобы сообщения этого соединения могли быть обработаны в рамках <em>Netty</em>. Сегодня мы посмотрим, как происходит управление сообщениями.</p>
+
+<!--more-->
+
+
+<p>Все начинается с этого метода, который вызывается после принятия открытого соединения:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void registerAcceptedChannel(SocketChannel acceptedSocket, Thread currentThread) {
+</span><span class='line'>  try {
+</span><span class='line'>      ChannelPipeline pipeline =
+</span><span class='line'>          channel.getConfig().getPipelineFactory().getPipeline();
+</span><span class='line'>      NioWorker worker = nextWorker();
+</span><span class='line'>      worker.register(new NioAcceptedSocketChannel(
+</span><span class='line'>              channel.getFactory(), pipeline, channel,
+</span><span class='line'>              NioServerSocketPipelineSink.this, acceptedSocket,
+</span><span class='line'>              worker, currentThread), null);
+</span><span class='line'>  } catch (Exception e) {
+</span><span class='line'>      try {
+</span><span class='line'>          acceptedSocket.close();
+</span><span class='line'>      } catch (IOException e2) {
+</span><span class='line'>      }
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Обработка сообщений в <em>Netty</em> производится цепочкой обработчиков, которая в терминологии <em>Netty</em> называется <code>pipeline</code>. Поэтому в первую очередь создается новый pipeline с помощью фабрики, которую мы проинициализировали в момент создания сервера. Для обработки сообщений в конкретном соединении канала создается отдельный Worker поток. За обработку операции ввода/вывода отвечают <code>Worker'ы</code>. В частности nio операции управляются <code>NioWorker'ом</code>. <code>Worker'ы</code> создаются внутри пула воркеров. Передавая в <code>NioServerSocketChannelFactory</code> пул воркер-потоков, этот пул оборачивается в <code>NioWorkerPool</code>, в конструкторе которого создаются экземпляры <code>NioWorker'ов</code>. Количество воркеров ограничено количеством процессоров, доступных JVM из расчета - на каждый процессор два воркера.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>static final int DEFAULT_IO_THREADS = Runtime.getRuntime().availableProcessors() * 2;</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Объекты воркеров хранятся в обычном массиве внутри пула. При регистрации канала, из пула воркеров последовательно достается воркер с помощью метода <code>nextWorker</code>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public E nextWorker() {
+</span><span class='line'>  return (E) workers[Math.abs(workerIndex.getAndIncrement() % workers.length)];
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Индекс текущего воркера хранится в <code>AtomicInteger</code> переменной. Целочисленное деление индекса на количество воркеров в пуле гарантирует получение воркера в пределах массива воркеров.</p>
+
+<p>Далее создается новый канал <code>NioAcceptedSocketChannel</code> и регистрируется внутри воркера. За принятие соединений отвечает один канал, за получение и отправку сообщений отвечает только что созданный канал. Регистрация канала начинается с создания объекта задачи регистрации <code>RegisterTask</code>. Этот объект специфичен для конкретного воркера и объявляется внутри него. Далее запускается поток воркера:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void run() {
+</span><span class='line'>  thread = Thread.currentThread();
+</span><span class='line'>
+</span><span class='line'>  boolean shutdown = false;
+</span><span class='line'>  Selector selector = this.selector;
+</span><span class='line'>  for (;;) {
+</span><span class='line'>      try {
+</span><span class='line'>          SelectorUtil.select(selector);
+</span><span class='line'>
+</span><span class='line'>          cancelledKeys = 0;
+</span><span class='line'>          processRegisterTaskQueue();
+</span><span class='line'>          processEventQueue();
+</span><span class='line'>          processWriteTaskQueue();
+</span><span class='line'>          processSelectedKeys(selector.selectedKeys());
+</span><span class='line'>
+</span><span class='line'>          if (selector.keys().isEmpty()) {
+</span><span class='line'>              if (shutdown ||
+</span><span class='line'>                  executor instanceof ExecutorService && ((ExecutorService) executor).isShutdown()) {
+</span><span class='line'>
+</span><span class='line'>                  synchronized (startStopLock) {
+</span><span class='line'>                      if (registerTaskQueue.isEmpty() && selector.keys().isEmpty()) {
+</span><span class='line'>                          started = false;
+</span><span class='line'>                          try {
+</span><span class='line'>                              selector.close();
+</span><span class='line'>                          } catch (IOException e) {
+</span><span class='line'>                          } finally {
+</span><span class='line'>                              this.selector = null;
+</span><span class='line'>                          }
+</span><span class='line'>                          break;
+</span><span class='line'>                      } else {
+</span><span class='line'>                          shutdown = false;
+</span><span class='line'>                      }
+</span><span class='line'>                  }
+</span><span class='line'>              } else {
+</span><span class='line'>                  if (allowShutdownOnIdle) {
+</span><span class='line'>                      shutdown = true;
+</span><span class='line'>                  }
+</span><span class='line'>              }
+</span><span class='line'>          } else {
+</span><span class='line'>              shutdown = false;
+</span><span class='line'>          }
+</span><span class='line'>      } catch (Throwable t) {
+</span><span class='line'>          try {
+</span><span class='line'>              Thread.sleep(1000);
+</span><span class='line'>          } catch (InterruptedException e) {
+</span><span class='line'>              // Ignore.
+</span><span class='line'>          }
+</span><span class='line'>      }
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Стоит отметить, что запуск потока вызывается в блоке синхронизации с объектом блокировки, который принадлежит конкретному объекту worker&#8217;а. Эта блокировка гарантирует последовательную обработку сообщений с помощью одного и того же воркера, взятого из пула.</p>
+
+<p>В основе работы потока все тот же бесконечный цикл и <code>Selector</code> для обеспечения эффективных пауз и обработки сообщений. Внутри <code>process*</code> методов выполняется обработка задач, которые висят в очереди, причем алгоритм работы этих методов идентичен. Различаются только очереди, из которых достаются задачи:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>for (;;) {
+</span><span class='line'>  final Runnable task = someQueue.poll();
+</span><span class='line'>  if (task == null) {
+</span><span class='line'>      break;
+</span><span class='line'>  }
+</span><span class='line'>  task.run();
+</span><span class='line'>  cleanUpCancelledKeys();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<blockquote><p>Зачем разведен Copy/Paste в методах обработки очередей, остается загадкой.</p></blockquote>
+
+<p>Задачи реализуют интерфейс <code>Runnable</code>. Метод регистрации регистрирует канал в <code>Selector'е</code> на события чтения/записи наподобие того, как регистрировался канал
+ принятия соединений на события принятия соединений.</p>
+
+<p>Интересен метод обработки ключей, обнаруженных селектором (принцип работы селектора описывался в предыдущей статье):</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void processSelectedKeys(Set&lt;SelectionKey> selectedKeys) throws IOException {
+</span><span class='line'>  for (Iterator&lt;SelectionKey> i = selectedKeys.iterator(); i.hasNext();) {
+</span><span class='line'>      SelectionKey k = i.next();
+</span><span class='line'>      i.remove();
+</span><span class='line'>      try {
+</span><span class='line'>          int readyOps = k.readyOps();
+</span><span class='line'>          if ((readyOps & SelectionKey.OP_READ) != 0 || readyOps == 0) {
+</span><span class='line'>              if (!read(k)) {
+</span><span class='line'>                  continue;
+</span><span class='line'>              }
+</span><span class='line'>          }
+</span><span class='line'>          if ((readyOps & SelectionKey.OP_WRITE) != 0) {
+</span><span class='line'>              writeFromSelectorLoop(k);
+</span><span class='line'>          }
+</span><span class='line'>      } catch (CancelledKeyException e) {
+</span><span class='line'>          close(k);
+</span><span class='line'>      }
+</span><span class='line'>
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Сразу бросается в глаза интересный способ обхода итератора по ключам селектора. В ключах Nio используется работа с константами на основе битов. Так метод <code>k.readyOps()</code> возвращает бит готовой операции. Сравнение констант производится с помощью побитовых операций. Сообщений в канале по большому счету может быть два - чтение и запись. О них мы поговорим в следующих статьях.</p>
+
+<p>После обработки всех задач выполняется проверка на наличие ключей в селекторе на всякий случай, и если ключи все обработались, то происходит закрытие селектора и прерывание цикла. В случае исключения, как и в Boss потоке, вызывается секундный <code>sleep</code> для предотвращения чрезмерной загрузки процессора в случае сбоев.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Подкаст: Третий выпуск]]></title>
+    <link href="http://knowlix.github.io/blog/2012/08/10/podcast-3/"/>
+    <updated>2012-08-10T22:45:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/08/10/podcast-3</id>
+    <content type="html"><![CDATA[<p>В две минуты о Netty, Spring Framework и Mockito.</p>
+
+<p><audio src="http://knowlix.github.io/podcast/3.mp3" preload="auto" /></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Netty: Управление соединениями]]></title>
+    <link href="http://knowlix.github.io/blog/2012/08/07/netty-connection-management/"/>
+    <updated>2012-08-07T21:35:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/08/07/netty-connection-management</id>
+    <content type="html"><![CDATA[<p>В прошлых статьях упоминалось, что Netty использует два разных пула потоков для организации соединений и чтения данных. Первый пул - Boss Pool, второй - Worker Pool. Как вы могли уже заметить в предыдущей статье, запуск boss потока выполняется в Sink объекте, внутри метода привязки открытого socket канала к конкретному адресу.</p>
+
+<!--more-->
+
+
+<p>Класс boss потока описан внутри Sink объекта, и новый поток запускается с помощью утилитарных классов и wrapper&#8217;ов:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Executor bossExecutor =
+</span><span class='line'>  ((NioServerSocketChannelFactory) channel.getFactory()).bossExecutor;
+</span><span class='line'>DeadLockProofWorker.start(bossExecutor,
+</span><span class='line'>      new ThreadRenamingRunnable(new Boss(channel),
+</span><span class='line'>              "New I/O server boss #" + id + " (" + channel + ')'));</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Netty именует потоки для ведения более человеко-понятных логов. Так обертка <code>ThreadRenamingRunnable</code> применяет заданное имя, когда поток запустится.</p>
+
+<p><code>Boss</code> - класс boss потока, который будет отслеживать новые соединения.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Boss(NioServerSocketChannel channel) throws IOException {
+</span><span class='line'>  this.channel = channel;
+</span><span class='line'>
+</span><span class='line'>  selector = Selector.open();
+</span><span class='line'>
+</span><span class='line'>  boolean registered = false;
+</span><span class='line'>  try {
+</span><span class='line'>      channel.socket.register(selector, SelectionKey.OP_ACCEPT);
+</span><span class='line'>      registered = true;
+</span><span class='line'>  } finally {
+</span><span class='line'>      if (!registered) {
+</span><span class='line'>          closeSelector();
+</span><span class='line'>      }
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  channel.selector = selector;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Во первых, Boss-поток связывается с <em>Netty</em> каналом. Также в конструкторе создается новый экземпляр Nio селектора.</p>
+
+<blockquote><p>Есть прекрасный класс в Nio <code>java.nio.channels.Selector</code>, который позволяет избежать создания большого числа потоков, следя за активностью каналов. Подписавшись на некое событие, можно получить ключи каналов, которые это действие совершили, и дальше уже работать с ними. Отслеживание активности каналов и возвращение только нужных берет на себя <code>Selector</code>. Таким образом, можно работать с несколькими каналами в одном потоке. Но в данном случае, <code>Seletor</code> используется немного для других целей и чуть позже мы увидим для каких именно.</p></blockquote>
+
+<p>Но для начала, необходимо зарегистрировать Nio каналы в селекторе и указать тип активности, за которым необходимо следить. В нашем случае используется <code>SelectionKey.OP_ACCEPT</code> для наблюдения за соединениями. Mетод <code>socket.register</code> выбрасывает <code>IOException</code>, если канал уже закрыт. В данном случае, селектор нам не нужен и его нужно закрыть, но т.к. само исключение пробрасывается выше, используется отдельная переменная для проверки успешности регистрации.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void run() {
+</span><span class='line'>  final Thread currentThread = Thread.currentThread();
+</span><span class='line'>
+</span><span class='line'>  channel.shutdownLock.lock();
+</span><span class='line'>  try {
+</span><span class='line'>      for (;;) {
+</span><span class='line'>          try {
+</span><span class='line'>              if (selector.select(1000) > 0) {
+</span><span class='line'>                  selector.selectedKeys().clear();
+</span><span class='line'>              }
+</span><span class='line'>
+</span><span class='line'>              for (;;) {
+</span><span class='line'>                  SocketChannel acceptedSocket = channel.socket.accept();
+</span><span class='line'>                  if (acceptedSocket == null) {
+</span><span class='line'>                      break;
+</span><span class='line'>                  }
+</span><span class='line'>                  registerAcceptedChannel(acceptedSocket, currentThread);
+</span><span class='line'>
+</span><span class='line'>              }
+</span><span class='line'>
+</span><span class='line'>          } catch (SocketTimeoutException e) {
+</span><span class='line'>          } catch (CancelledKeyException e) {
+</span><span class='line'>          } catch (ClosedSelectorException e) {
+</span><span class='line'>          } catch (ClosedChannelException e) {
+</span><span class='line'>              break;
+</span><span class='line'>          } catch (Throwable e) {
+</span><span class='line'>              if (logger.isWarnEnabled()) {
+</span><span class='line'>                  logger.warn(
+</span><span class='line'>                          "Failed to accept a connection.", e);
+</span><span class='line'>              }
+</span><span class='line'>
+</span><span class='line'>              try {
+</span><span class='line'>                  Thread.sleep(1000);
+</span><span class='line'>              } catch (InterruptedException e1) {
+</span><span class='line'>              }
+</span><span class='line'>          }
+</span><span class='line'>      }
+</span><span class='line'>  } finally {
+</span><span class='line'>      channel.shutdownLock.unlock();
+</span><span class='line'>      closeSelector();
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Основной метод потока вызывает блокировку, используя <code>ReentrantLock</code> канала. Таким образом, один канал будет иметь только один работающий Boss поток в одно и тоже время. Кроме того, <code>ReentrantLock</code> считается более эффективным решением в условиях жесткой конуренции и обладает некоторыми функциональными преимуществами по сравнению с synchronized блоками.</p>
+
+<p>Как это нередко бывает в потоке используются бесконечные циклы для постоянного выполнения. Далее, с помощью селектора прослушиваются каналы на наличие новых соединений. Во время выполнения метода <code>selector.select</code> поток блокируется до тех пор пока не будет получено соединение, либо не будет превышен таймаут. В целях освобождения памяти, ключи, по которым можно было бы получить доступ к Nio каналу, очищаются.</p>
+
+<p>После истечения секунды на ожидание соединения, либо в случае появления этих самых соединений начинает свое выполнение внутренний бесконечный цикл, который принимает все появившиеся соединения без каких-либо задержек. В случае, если селектор был прерван по таймауту и никаких соединений не поступило, то при первом вызове <code>channel.socket.accept()</code> будет возвращен null. Если же соединения присутствуют, то возвращается новый сокет канал, который отправляется в метод <code>registerAcceptedChannel</code> для создания нового worker потока, который будет следить за событиями чтения, записи внутри канала.</p>
+
+<p>Стоит отметить, что в данном <code>Selector'е</code> всегда будет зарегистрирован только один boss канал, поэтому ключи, которые он возвращает Netty не интересуют. <code>Selector</code> в данном контексте - это оптимальный <code>sleep</code> метод, который может прерываться, когда появляется необходимость. Еще стоит обратить внимание, что исключения в основном игнорируются. Работа потока прекращается в случае закрытия канала. Если было выбрашено IOException или, возможно, какое-то Runtime исключение, то поток приостанавливается на секунду и далее продолжает свою работу в нормальном режиме.</p>
+
+<p>В конце выполнения потока, блокировка снимается.</p>
+
+<p>В следующей статье мы рассмотрим как обрабатываются события worker каналов.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Netty: Запуск socket сервера]]></title>
+    <link href="http://knowlix.github.io/blog/2012/08/04/netty-start-server/"/>
+    <updated>2012-08-04T12:39:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/08/04/netty-start-server</id>
+    <content type="html"><![CDATA[<p>Как было отмечено ранее, стабильная ветка <a href="http://netty.io/">Netty</a> обладает отличным <a href="http://static.netty.io/3.5/api/">JavaDoc</a>, а более новая четвертая ветка практически не задокументирована. Хочется еще отметить, что в <em>JavaDoc&#8217;е</em> <em>Netty</em> используется специальный <em>JavaDoc</em> доклет <a href="http://code.google.com/p/apiviz/">ApiViz</a>, который позволяет отображать связи компонент прямо в документации ввиде графиков. В связи с этим обзор архитектуры будет вестись по 3ей версии. Именно по ней будет изучена терминология проекта, а уже с какими-то знаниями о компонентах системы мы посмотрим на отличия в реализации той или иной фичи в новой четвертой версии <em>Netty</em>.</p>
+
+<!--more-->
+
+
+<p>В качестве отправной точки, будем использовать учебный проект Echo сервера, идущий вместе с исходниками <em>Netty</em>.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ServerBootstrap bootstrap = new ServerBootstrap(
+</span><span class='line'>  new NioServerSocketChannelFactory(
+</span><span class='line'>          Executors.newCachedThreadPool(),
+</span><span class='line'>          Executors.newCachedThreadPool()));
+</span><span class='line'>
+</span><span class='line'>bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
+</span><span class='line'>  public ChannelPipeline getPipeline() throws Exception {
+</span><span class='line'>      return Channels.pipeline(new EchoServerHandler());
+</span><span class='line'>  }
+</span><span class='line'>});
+</span><span class='line'>
+</span><span class='line'>bootstrap.bind(new InetSocketAddress(port));</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Запуск сервера начинается с создания объекта helper класса <code>ServerBootstrap</code>. Этот объект позволяет сконфигурировать сервер, наполнить его ключевыми компонентами  и наконец, запустить. В первую очередь необходимо указать фабрику каналов. Каналы представляют собой сетевое соединение и <em>Netty</em> поддерживает несколько их реализаций. Основные из них это соединения использующие:</p>
+
+<ol>
+<li>Old I/O Java package</li>
+<li>New I/O Java package</li>
+</ol>
+
+
+<p>Если первый тип реализации - это скорее пережиток прошлого и нужен лишь для поддержки старых программ, то второй тип - это то, что нам нужно. <code>ChannelFactory</code> можно не задавать в конструкторе <code>ServerBootstrap</code>, а использовать <code>ServerBootstrap#setChannelFactory</code> метод. Setter-метод можно использовать только один раз. Это лишь логическое ограничение, которое проверяется естественно только в runtime&#8217;e.</p>
+
+<p><code>NioServerSocketChannelFactory</code> оперирует двумя пулами потоков для создание асинхронных соединений. Пулы можно задать в конструкторе <code>ChannelFactory</code>. В противном случае создаются стандартные кеширующие java пулы:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Executors.newCachedThreadPool()</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Зачем фабрике каналов два пула потоков? Первый из них - boss pool. Создает новые потоки для входящих соединений. Второй же worker pool, обеспечивает потоки для неблокирующих операций записи/чтения.</p>
+
+<p>При создании соединения для канала создается свой pipeline - цепочка обработчиков асинхронных событий каналов. Поэтому <code>ServerBootstrap</code> должен обладать фабрикой pileline&#8217;ов. Создавая фабрику pipeline&#8217;ов определяются обработчики. В данном случае это один обработчик <code>EchoServerHandler</code>. Удивительно, что без фабрик каналов и pipeline&#8217;ов сервер работать не будет, но в архитектуре возможность создания сервера без фабрик есть, т.к. задаются они setter методами.</p>
+
+<p><code>ServerBootstrap#bind</code> запускает сервер, а точнее вешает сервер на определенный адрес. Рассмотрим на данном примере, как запускается <em>NIO Socet Server</em>.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Channel bind(final SocketAddress localAddress) {
+</span><span class='line'>  if (localAddress == null) {
+</span><span class='line'>      throw new NullPointerException("localAddress");
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  final BlockingQueue&lt;ChannelFuture> futureQueue = new LinkedBlockingQueue&lt;ChannelFuture>();
+</span><span class='line'>
+</span><span class='line'>  ChannelHandler binder = new Binder(localAddress, futureQueue);
+</span><span class='line'>  ChannelHandler parentHandler = getParentHandler();
+</span><span class='line'>
+</span><span class='line'>  ChannelPipeline bossPipeline = pipeline();
+</span><span class='line'>  bossPipeline.addLast("binder", binder);
+</span><span class='line'>  if (parentHandler != null) {
+</span><span class='line'>      bossPipeline.addLast("userHandler", parentHandler);
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  Channel channel = getFactory().newChannel(bossPipeline);
+</span><span class='line'>
+</span><span class='line'>  // Wait until the future is available.
+</span><span class='line'>  ChannelFuture future = null;
+</span><span class='line'>  boolean interrupted = false;
+</span><span class='line'>  do {
+</span><span class='line'>      try {
+</span><span class='line'>          future = futureQueue.poll(Integer.MAX_VALUE, TimeUnit.SECONDS);
+</span><span class='line'>      } catch (InterruptedException e) {
+</span><span class='line'>          interrupted = true;
+</span><span class='line'>      }
+</span><span class='line'>  } while (future == null);
+</span><span class='line'>
+</span><span class='line'>  if (interrupted) {
+</span><span class='line'>      Thread.currentThread().interrupt();
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  future.awaitUninterruptibly();
+</span><span class='line'>  if (!future.isSuccess()) {
+</span><span class='line'>      future.getChannel().close().awaitUninterruptibly();
+</span><span class='line'>      throw new ChannelException("Failed to bind to: " + localAddress, future.getCause());
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  return channel;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Запуск сервера начинается с открытия нового канала, который создается с помощью фабрики каналов, которую мы засетили. В нашем случае будет создан <code>NioServerSocketChannel</code>. В конструкторе этого канала будет создан Java <code>SocetChannel</code>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>socket = ServerSocketChannel.open()</span></code></pre></td></tr></table></div></figure>
+
+
+<p>И если socket открыт удачно, то канал сигнализирует событие об открытии нового канала.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static void fireChannelOpen(Channel channel) {
+</span><span class='line'>  if (channel.getParent() != null) {
+</span><span class='line'>      fireChildChannelStateChanged(channel.getParent(), channel);
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  channel.getPipeline().sendUpstream(
+</span><span class='line'>          new UpstreamChannelStateEvent(
+</span><span class='line'>                  channel, ChannelState.OPEN, Boolean.TRUE));
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Стоит рассказать, что в событийной модели <em>Netty</em> присутствуют два вида сообщений:</p>
+
+<ol>
+<li><em>Upstream</em> - входящие</li>
+<li><em>Downstream</em> - исходящие</li>
+</ol>
+
+
+<p>Все сообщения циркулируют по pipeline. Можно рассматривать pipeline, как цепочку обработчиков событий. Любой обработчик может остановить на себе обработку сообщения. Посыл сообщений происходит соответственно через pipeline.</p>
+
+<p>Канал может быть создан другим каналом. Тот будет для нового канала родительским. Для каналов клиентской стороны родительским каналом будет канал серверной стороны. Входящее сообщение об открытии канала посылается и родительскому каналу, если он есть (метод <code>fireChildChannelStateChanged</code>), и обработчикам данного канала.</p>
+
+<p>Boss-канал, открывающий соединение, на данном этапе кроме открытия сокета и порождения события об этом, ничего не делает и не может делать, так как не обладает нужной для этого информацией. Как же происходит слежение за сообщениями данного канала? Очевидно, что у данного канала должны быть свои обработчики, которые будут ожидать события открытия соединения и в этот момент выполнять всю необходимую для нас работу.</p>
+
+<p>При создании в <code>ServerBootstrap</code> нового сокет канала инициализирует boss pipeline, куда добавляется обязательный обработчик <code>Binder</code> и пользовательский обработчик, который можно задать через метод <code>ServerBootstrap#setParentHandler</code>. Класс обязательного обработчика является внтуренним для класса <code>ServerBootstrap</code>, т.к. является неотъемлемой его частью. В момент получения события об открытии нового socket-канала, <code>Binder</code> получает ссылку на Netty канал из объекта события и задает ему пользовательский <code>PipelineFactory</code>, пользовательские настройки и привязывает открытое соединение к конкретному адресу. По аналогии с Java сокетами, Netty сокеты также обладают методом bind, который привязывает его к конкретному адресу.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static ChannelFuture bind(Channel channel, SocketAddress localAddress) {
+</span><span class='line'>  if (localAddress == null) {
+</span><span class='line'>      throw new NullPointerException("localAddress");
+</span><span class='line'>  }
+</span><span class='line'>  ChannelFuture future = future(channel);
+</span><span class='line'>  channel.getPipeline().sendDownstream(new DownstreamChannelStateEvent(
+</span><span class='line'>          channel, future, ChannelState.BOUND, localAddress));
+</span><span class='line'>  return future;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Асинхронная модель работы <em>Netty</em> основана не тольно на событиях, но также и на Future объектах. Если события обеспечивают работу через callback&#8217;и и в данном случае поток, вызвавший операцию, никак не связан с асинхронным процессом, то Future объект предоставляет loop алгоритм, связывая асинхронный вызванный процесс с его родителем. Запуск сервера - как раз такой случай, т.к. этот метод должен вернуть открытый и сконфигурированный канал. Но если до данного момента работа шла в синхронном режиме, то привязка адреса к открытому соединению полноценно открывает сервер для клиентских соединений, запуская соответствующие потоки. Поэтому данный метод возвращает <code>ChannelFuture</code> объект с сылкой на текущий канал и вызывает исходящее событие привязки сервера к адресу.</p>
+
+<p>В методах pipeline&#8217;а отправки сообщения происходит некоторое проксирование сообщений, т.к. разные реализации каналов могут работать по разному с разными сообщениями. Очевидно, что проксирование сообщений специфично для разных видов реализаций каналов, поэтому фабрика каналов, помимо типа самих каналов определяет конкретную реализацию проксирующего класса. Проксирующий класс определяет какие сообщения поддерживает канал и возможно даже обрабатывает какие-то из них, которые служат только для внутреннего использования. Такие объекты в <em>Netty</em> именуются <em>Sink</em> объектами. В данном случае обработка события привязки сервера к адресу обрабатывается внутри <code>NioServerSocketPipelineSink</code>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void bind(
+</span><span class='line'>      NioServerSocketChannel channel, ChannelFuture future,
+</span><span class='line'>      SocketAddress localAddress) {
+</span><span class='line'>
+</span><span class='line'>  boolean bound = false;
+</span><span class='line'>  boolean bossStarted = false;
+</span><span class='line'>  try {
+</span><span class='line'>      channel.socket.socket().bind(localAddress, channel.getConfig().getBacklog());
+</span><span class='line'>      bound = true;
+</span><span class='line'>
+</span><span class='line'>      future.setSuccess();
+</span><span class='line'>      fireChannelBound(channel, channel.getLocalAddress());
+</span><span class='line'>
+</span><span class='line'>      Executor bossExecutor =
+</span><span class='line'>          ((NioServerSocketChannelFactory) channel.getFactory()).bossExecutor;
+</span><span class='line'>      DeadLockProofWorker.start(bossExecutor,
+</span><span class='line'>              new ThreadRenamingRunnable(new Boss(channel),
+</span><span class='line'>                      "New I/O server boss #" + id + " (" + channel + ')'));
+</span><span class='line'>      bossStarted = true;
+</span><span class='line'>  } catch (Throwable t) {
+</span><span class='line'>      future.setFailure(t);
+</span><span class='line'>      fireExceptionCaught(channel, t);
+</span><span class='line'>  } finally {
+</span><span class='line'>      if (!bossStarted && bound) {
+</span><span class='line'>          close(channel, future);
+</span><span class='line'>      }
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>В первую очередь вызывается привязка адреса к <em>Java</em> сокету. Далее <code>ChannelFuture</code> переводится в состояние успешного выполнения операции и посылается уже входящее сообщение pipeline&#8217;у канала о привязке сервера к адресу. Далее получается пул потоков, который мы передали фабрике каналов и с помощью него запускается boss-поток, который будет следить за соединениями по данному каналу. Теперь наш сервер может принимать соединения и обрабатывать их нашим pipeline&#8217;ом.</p>
+
+<p>Т.е. на данном этапе <em>Binder</em> обработчик связал сокет с адресом и осталось оповестить <code>ServerBootstrap</code> о статусе конфигурирования канала и вернуть наружу ссылку на сам канал. Но тут есть две проблемы:</p>
+
+<ol>
+<li>Событийная модель <em>Netty</em> работает в асинхронном режиме, что не дает вернуть напрямую результат работы обработчика</li>
+<li>Так как режим асинхронный, то <code>ServerBootstrap</code> работает в своем пространстве и, если не предпринято каких-то шаманских действий, то вполне возможно уже отработал.</li>
+</ol>
+
+
+<p>А шаманские действия, как вы уже возможно успели заметить, предприняты. В <code>ServerBootstrap</code> до инициализации <em>Binder</em> обработчика создается <code>BlockingQueue</code>, которая передается в <em>Binder</em>. Далее, проинициализировав boss обработчик и создав канал, <code>ServerBootstrap</code> пытается прочитать из очереди <code>ChannelFuture</code>, но так как очередь блокирующая и в ней нет на данный момент сообщений, то поток <code>ServerBootstrap</code> подвешивается пока очередь не будет готова вернуть сообщение.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>future = futureQueue.poll(Integer.MAX_VALUE, TimeUnit.SECONDS);</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Как только <em>Binder</em> сконфигурировал открытый канал, он помещает <code>ChannelFuture</code> объект, который мы ранее рассмотрели в методе <code>bind</code> самого канала, в эту очередь:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>boolean finished = futureQueue.offer(evt.getChannel().bind(localAddress));</span></code></pre></td></tr></table></div></figure>
+
+
+<p>В этот момент поток выполнения <code>ServerBootstrap</code> оживает и получает это сообщение из очереди и если статус <code>ChannelFuture</code> говорит, что все прошло хорошо, то наружу возвращает ссылка на открытый канал.</p>
+
+<p>Вот так просто и изящно создаются socket соединения в <em>Netty 3.5</em>.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Netty: Структура проекта]]></title>
+    <link href="http://knowlix.github.io/blog/2012/07/22/netty-common-knowladge/"/>
+    <updated>2012-07-22T10:36:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/07/22/netty-common-knowladge</id>
+    <content type="html"><![CDATA[<p><a href="http://netty.io">Netty</a> - framework для написания приложений, взаимодействующих по сети. Это может быть и балансировщик нагрузки, и сетевой паук, и практически любая другая архитектура, основанная на понятии client/server.</p>
+
+<!--more-->
+
+
+<p>В основе лежит <code>java.io</code> и <code>java.nio</code>. Выбор базового механизма осуществляется путем использования конкретных реализаций ключевых компонентов. Подход к их использованию скрыт под абстракцией и интерфейсами, так что перейти от одного к другому не составит труда в отличие от того, как бы это было реализовано в <em>Java</em>.</p>
+
+<p>Все сетевые операции асинхронны. Управление асинхронным взаимодействием осуществляется на основе событийной модели или с использованием <em>Future</em> объектов подобных <em>Future</em> объектам в <em>Java</em>.</p>
+
+<p>Workflow типичной программы на Netty:</p>
+
+<ol>
+<li>Создается новый экземпляр <code>ChannelFactory</code> - фабрика, порождающая каналы - базовые сущности библиотеки. Именно они скрывают за собой особенность реализации процесса сетевого взаимодействия. По большому счету, канал - это абстракция над соединением, куда можно писать и откуда можно читать информацию. Очевдно, что реализация <code>ChannelFactory</code> также отражает используемые технологии. Например, для использования java.nio используется <code>NioServerSocketChannelFactory</code>.</li>
+<li>Создается новый экземпляр <code>Bootstrap</code> объекта - вспомогательный класс, который упрощает процесс конфигурирования приложения. Обязательным параметром Bootstrap объекта является <code>ChannelFactory</code>, с помощью которого приложение будет открывать новые сетевые соединения.</li>
+<li>Задается фабрика <code>ChannelPipelineFactory</code>, которая является ключевым элементом в событийной модели <em>Netty</em>. Обработчики событий <code>ChannelHandler</code> организованы подобно обработчикам <em>JUnit</em> или <em>Mockito</em> (возможно, не совсем равноценное сравнение), т.е. каждому методу обработчика соответствует событие. Переопределяя эти методы, мы подписываемся на связанные с ними события. <em>Netty</em> оперирует цепочкой обработчиков <code>ChannelPipeline</code>, т.е. отреагировав на событие, один обработчик передает управление другому обработчику в цепочке. Реализуя фабрику pipeline&#8217;ов, мы можем определить свои обработчики в цепочке.</li>
+<li>Второстепенная конфигурация приложения через <code>Bootstrap</code>.</li>
+<li>Запуск сетевого приложения.</li>
+<li>Завершение сетевого приложения.</li>
+</ol>
+
+
+<p><em>Netty</em> потрясающе документирован. Его документация по-настоящему самодостаточна и понятна. Крайне рекомендую изучить примеры использования этой библиотеки в <a href="http://static.netty.io/3.5/guide/">официальной документации проекта</a>. Кстати о версиях. На данный момент, финальная версия - <code>3.5.2</code>. Последний релиз был 5го июля 2012 года. Но вместе с тем идет разработка 4ой версии <em>Netty</em>. К сожалению, эта версия находится в Alpha стадии и не имеет какого либо руководства пользователя. При этом, структура классов немного поменялась, поэтому просто так использовать новую версию не получится.</p>
+
+<p>Исходные коды хостятся на <a href="https://github.com/netty/netty">Github</a>. В качестве build tool используется <em>Maven</em>. Проект организован в виде нескольких модулей. Т.е. внутри корневого пакета <code>io.netty</code> пакеты разделены на модули. Каждый модуль находится в отдельном каталоге, который реализован также ввиде maven проекта. Внутри центрального pom файла объявляются все дочерние модули:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;modules>
+</span><span class='line'>  &lt;module>common&lt;/module> - утилитарные классы + логирование
+</span><span class='line'>  &lt;module>buffer&lt;/module> - базовая структура данных и все, что требуется для ее работы
+</span><span class='line'>  &lt;module>codec&lt;/module> - реализации обработчиков, преобразующие данные в цепочке обработки
+</span><span class='line'>  &lt;module>codec-http&lt;/module> - реализация обработчиков и утилитарных методов, специфичных для взаимодействия поверх HTTP
+</span><span class='line'>  &lt;module>transport&lt;/module> - ядро *Netty*, управляющее передачей данных и соединением (Bootstrap, Channel, ChannelHandler)
+</span><span class='line'>  &lt;module>handler&lt;/module> - утилитарные классы, необходимые для работы обработчиков
+</span><span class='line'>  &lt;module>example&lt;/module> - примеры программ, использующих *Netty*
+</span><span class='line'>  &lt;module>testsuite&lt;/module> - тесты на *JUnit*. Тестов немного, но они есть.
+</span><span class='line'>  &lt;module>all&lt;/module> - сборка всех модулей в один jar'файл
+</span><span class='line'>  &lt;module>tarball&lt;/module> - сборка в tarball архив
+</span><span class='line'>&lt;/modules></span></code></pre></td></tr></table></div></figure>
+
+
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Подкаст: Второй выпуск]]></title>
+    <link href="http://knowlix.github.io/blog/2012/07/20/podcast-2/"/>
+    <updated>2012-07-20T23:01:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/07/20/podcast-2</id>
+    <content type="html"><![CDATA[<p>Пятничный подкаст проекта.</p>
+
+<p><audio src="http://knowlix.github.io/podcast/2.mp3" preload="auto" /></p>
+
+<p>Курс Мартина Одерски: <a href="https://www.coursera.org/course/progfun">Функциональное программирование в Scala</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Прицельный обзор: Зачем Spring'у proxy объекты]]></title>
+    <link href="http://knowlix.github.io/blog/2012/07/17/spring-about-proxy/"/>
+    <updated>2012-07-17T00:01:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/07/17/spring-about-proxy</id>
+    <content type="html"><![CDATA[<p>Как уже стало известно, в основе процесса создания <a href="http://www.springsource.org/spring-framework">Spring</a> бинов лежит <em>CGLib</em> - очень распространенная библиотека для создания классов в режиме реального времени. Ее используют такие библиотеки как <em>Hibernate</em>, <em>iBATIS</em> и <a href="http://cglib.sourceforge.net">многие другие</a>.</p>
+
+<!--more-->
+
+
+<p>Иногда в <em>spring&#8217;e</em> появляется необходимость переопределить некоторые методы бина. Типичный случай - разные жизненные циклы связанных бинов. Например, singleton bean должен работать при каждом вызове своих методов с новым экземпляром связанного с ним не singleton бина. В данном случае <em>Spring</em> не сможет обеспечить такую логику, т.к. связанный бин заинжектируется в момент создания singleton бина.</p>
+
+<blockquote><p>В Spring&#8217;е есть возможность указать родной для первого бина метод, при вызове которого будет создаваться и возвращаться новый экземпляр связанного бина. Помимо этого есть возможность переопределять методы с помощью <code>MethodReplacer</code>&#8216;a. Подробнее <a href="http://static.springsource.org/spring/docs/1.2.x/reference/beans.html#beans-factory-method-injection">здесь</a>.</p></blockquote>
+
+<p>Эти фичи требуют создания proxy объектов бинов, а реализуется все это безобразие с помощью всем известной библиотеки <em>CGLib</em>. После того, как beanFactory определил все метаданные для создания бина и не нашел его в кеше, то он пытается его создать следующим образом:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Object instantiate(RootBeanDefinition beanDefinition, String beanName, BeanFactory owner) {
+</span><span class='line'>  if (beanDefinition.getMethodOverrides().isEmpty()) {
+</span><span class='line'>      Constructor&lt;?> constructorToUse;
+</span><span class='line'>      synchronized (beanDefinition.constructorArgumentLock) {
+</span><span class='line'>          constructorToUse = (Constructor&lt;?>) beanDefinition.resolvedConstructorOrFactoryMethod;
+</span><span class='line'>          if (constructorToUse == null) {
+</span><span class='line'>              final Class clazz = beanDefinition.getBeanClass();
+</span><span class='line'>              if (clazz.isInterface()) {
+</span><span class='line'>                  throw new BeanInstantiationException(clazz, "Specified class is an interface");
+</span><span class='line'>              }
+</span><span class='line'>              try {
+</span><span class='line'>                  if (System.getSecurityManager() != null) {
+</span><span class='line'>                      constructorToUse = AccessController.doPrivileged(new PrivilegedExceptionAction&lt;Constructor>() {
+</span><span class='line'>                          public Constructor run() throws Exception {
+</span><span class='line'>                              return clazz.getDeclaredConstructor((Class[]) null);
+</span><span class='line'>                          }
+</span><span class='line'>                      });
+</span><span class='line'>                  }
+</span><span class='line'>                  else {
+</span><span class='line'>                      constructorToUse =  clazz.getDeclaredConstructor((Class[]) null);
+</span><span class='line'>                  }
+</span><span class='line'>                  beanDefinition.resolvedConstructorOrFactoryMethod = constructorToUse;
+</span><span class='line'>              }
+</span><span class='line'>              catch (Exception ex) {
+</span><span class='line'>                  throw new BeanInstantiationException(clazz, "No default constructor found", ex);
+</span><span class='line'>              }
+</span><span class='line'>          }
+</span><span class='line'>      }
+</span><span class='line'>      return BeanUtils.instantiateClass(constructorToUse);
+</span><span class='line'>  }
+</span><span class='line'>  else {
+</span><span class='line'>      return instantiateWithMethodInjection(beanDefinition, beanName, owner);
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>В методе проверяется есть ли в <code>BeanDefinition</code> объекте переопределенные методы. Если нет, то объект просто инстанцируется с помощью <em>reflection</em>&#8216;а, иначе вызывается метод <code>instantiateWithMethodInjection</code>, в котором и реализована работа создания proxy объектов бинов через <code>CglibSubclassCreator</code>. <code>SubclassCreator</code> имеет основной метод <code>instantiate</code>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Object instantiate(Constructor ctor, Object[] args) {
+</span><span class='line'>       Enhancer enhancer = new Enhancer();
+</span><span class='line'>       enhancer.setSuperclass(this.beanDefinition.getBeanClass());
+</span><span class='line'>       enhancer.setCallbackFilter(new CallbackFilterImpl());
+</span><span class='line'>       enhancer.setCallbacks(new Callback[] {
+</span><span class='line'>          NoOp.INSTANCE,
+</span><span class='line'>          new LookupOverrideMethodInterceptor(),
+</span><span class='line'>    new ReplaceOverrideMethodInterceptor()
+</span><span class='line'>       });
+</span><span class='line'>
+</span><span class='line'>       return (ctor == null) ? 
+</span><span class='line'>          enhancer.create() : 
+</span><span class='line'>    enhancer.create(ctor.getParameterTypes(), args);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>В этом методе создается Enhancer - объект библиотеки CGLib, который конструирует proxy классы. Указывается класс, от которого стоит унаследоваться. В данном случае это класс самого бина. Далее указываются обработчики переопределяемых методов. На данный момент это три вида <code>MethodInterceptor</code>&#8216;a:</p>
+
+<ol>
+<li><code>NoOp.INSTANCE</code> - константа библиотеки CGLib, передающая управление реальным методам</li>
+<li><code>LookupOverrideMethodInterceptor</code> оборабатывает методы, возвращающие новые экземпляры бинов.</li>
+<li><code>ReplaceOverrideMethodInterceptor</code> обрабатывает методы, переопределенные с помощью <code>MethodReplacer</code>&#8216;a.</li>
+</ol>
+
+
+<p>Оба эти класса объявляены внутри <code>SubclassCreator</code>&#8216;а. Метод <code>enhancer.create()</code> конструирует класс и создает экземпляр объекта этого класса.</p>
+
+<p>Стоит заметить, что <code>beanDefintion</code> и <code>beanFactory</code> хранятся в полях <code>SubclassCreator</code>&#8216;а, и объявленные в нем классы имеют доступ к ним. Эти поля помечены модификатором final, что гарантирует доступ только на чтение к значениям этих полей.</p>
+
+<p>Объект бина создан и его можно вернуть для инжектирования в клиентскую программу. При вызове методов бинов, созданных с помощью CGLib, передается управление обработчикам методов, которые указаны у proxy объекта. При создании бина были указаны 3 обработчика и <code>CallbackFilter</code>. При добавлении обработчика он получает индекс, как в массиве. <code>CallbackFilter</code> определяет какой из обработчиков выполнится, указывая его индекс. В spring&#8217;e создается свой фильтр обработчиков <code>CallbackFilterImpl</code>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private class CallbackFilterImpl extends CglibIdentitySupport implements CallbackFilter {
+</span><span class='line'>    
+</span><span class='line'>    public int accept(Method method) {
+</span><span class='line'>        MethodOverride methodOverride = beanDefinition.getMethodOverrides().getOverride(method);
+</span><span class='line'>        if (logger.isTraceEnabled()) {
+</span><span class='line'>            logger.trace("Override for '" + method.getName() + "' is [" + methodOverride + "]");
+</span><span class='line'>        }
+</span><span class='line'>        if (methodOverride == null) {
+</span><span class='line'>            return PASSTHROUGH;
+</span><span class='line'>        }
+</span><span class='line'>        else if (methodOverride instanceof LookupOverride) {
+</span><span class='line'>            return LOOKUP_OVERRIDE;
+</span><span class='line'>        }
+</span><span class='line'>        else if (methodOverride instanceof ReplaceOverride) {
+</span><span class='line'>            return METHOD_REPLACER;
+</span><span class='line'>        }
+</span><span class='line'>        throw new UnsupportedOperationException(
+</span><span class='line'>                "Unexpected MethodOverride subclass: " + methodOverride.getClass().getName());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Как можно заметить, переопределяемые методы представляют собой <code>MethodOverride</code> объект, который определяет его имя, имя объекта, которому он принадлежит и другую мета информацию о методе. Но сам по себе этот класс абстрактный, а наследуют его два класса:</p>
+
+<ol>
+<li><code>LookupOverride</code> для объявления порождающих методов</li>
+<li><code>ReplaceOverride</code> для объявления методов, переопределяемых произвольной логикой</li>
+</ol>
+
+
+<p>Определяя тип переопределяемого метода, определяется индекс обработчика. Индекс обработчика задан в виде константы.</p>
+
+<p>При вызове обработчика <code>LookupOverrideMethodInterceptor</code> вызывается создание бина с помощью beanFactory текущего бина по имени, которое задано в LookupOverride. Это имя попадает туда из соответствующей директивы конфигурации бинов:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;lookup-method name="createSingleShotHelper" bean="singleShotHelper"/></span></code></pre></td></tr></table></div></figure>
+
+
+<p>При вызове <code>ReplaceOverrideMethodInterceptor</code> получается указанный в <code>ReplaceOverride</code> <code>MethodReplacer</code> и вызывается его основной метод с логикой, куда передается информация о вызванном методе, аргументах и самом объекте. Объект <code>MethodReplacer</code> также определяется в конфигурации директивой:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;replaced-method name="computeValue" replacer="replacementComputeValue"></span></code></pre></td></tr></table></div></figure>
+
+
+<p>Как видно из строчки конфигурации, задается имя бина <code>MethodReplacer</code>&#8216;a. Поэтому в <code>ReplaceOverride</code> объекте хранится просто имя, а при обработке вызова метода данным обработчиком по имени бина получается объект с помощью все той же <code>BeanFactory</code>.</p>
+
+<p>Как видно из данного обзора, подход оперирования именами бинов во всех частях конфигурации в некоторых ситуациях может вызывать достаточно большой overhead при работе с proxy объектами.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Подкаст: Первый выпуск]]></title>
+    <link href="http://knowlix.github.io/blog/2012/07/13/podcast-1/"/>
+    <updated>2012-07-13T23:24:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/07/13/podcast-1</id>
+    <content type="html"><![CDATA[<p>Решил попробовать проговаривать основные новости по прошедшей неделе и о планах на следующую в виде короткого подкаста.</p>
+
+
+<p><audio src="http://knowlix.github.io/podcast/1.mp3" preload="auto" /></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Прицельный обзор: Как создаются бины в Spring Framework]]></title>
+    <link href="http://knowlix.github.io/blog/2012/07/10/spring-creating-beans/"/>
+    <updated>2012-07-10T01:09:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/07/10/spring-creating-beans</id>
+    <content type="html"><![CDATA[<p>Основной интерфейс - <code>BeanFactory</code>. Основной метод - <code>getBean</code>. Его расширяют такие интерфейсы как:</p>
+
+
+
+
+<ul class="enum">
+    <li><code>ListableBeanFactory</code> для доступа к спискам экземпляров созданных bean&#8217;ов</li>
+    <li><code>HierarchicalBeanFactory</code> для организации иерархичных фабрик бинов</li>
+    <li><code>ConfigurableBeanFactory</code> определяет методы, конфигурирующие бины</li>
+</ul>
+
+
+
+
+<!--more-->
+
+
+
+
+<p>Этих интерфейсов бесчисленное множество. По отдельности они практически не используются, а служат для создания больших многофункциональных объектов фабрик. Для инициации загрузки необходим конфигурационный файл. За обработку источников конфигурации бинов отвечают BeanDefinition объекты:</p>
+
+
+
+
+<ul class="enum">
+    <li><code>PropertiesBeanDefinitionReader</code> для конфигурирования бинов в property файлах</li>
+    <li><code>XmlBeanDefinitionReader</code> для конфигурирования бинов с помощью xml</li>
+</ul>
+
+
+
+
+<p>Естественно, наиболее популярен XML BeanDefinition, но очевидно, что скоро и от XML откажутся, как от пережитка прошлого, в пользу <em>Java</em> синтаксиса. Но это будущее, а сейчас вершина <code>FactoryBean</code> иерархии - <code>XmlBeanFactory</code>. Этот объект определяет все специфичные для создания бинов с помощью xml конфигураций реализации, такие как <code>XmlBeanDefinitionReader</code>. Настройки бина, обявленного в конфиге, хранятся в BeanDefinition объекте. Все эти объекты хранятся в реестре бинов - <code>BeanDefinitionRegistry</code>.</p>
+
+
+
+
+<p>Как же строятся бины?</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public &lt;T> T getBean(Class&lt;T> requiredType) throws BeansException {
+</span><span class='line'>    Assert.notNull(requiredType, "Required type must not be null");
+</span><span class='line'>    String[] beanNames = getBeanNamesForType(requiredType);
+</span><span class='line'>    if (beanNames.length > 1) {
+</span><span class='line'>        ArrayList&lt;String> autowireCandidates = new ArrayList&lt;String>();
+</span><span class='line'>        for (String beanName : beanNames) {
+</span><span class='line'>            if (getBeanDefinition(beanName).isAutowireCandidate()) {
+</span><span class='line'>                autowireCandidates.add(beanName);
+</span><span class='line'>            }
+</span><span class='line'>        }
+</span><span class='line'>        if (autowireCandidates.size() > 0) {
+</span><span class='line'>            beanNames = autowireCandidates.toArray(new String[autowireCandidates.size()]);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    if (beanNames.length == 1) {
+</span><span class='line'>        return getBean(beanNames[0], requiredType);
+</span><span class='line'>    }
+</span><span class='line'>    else if (beanNames.length == 0 && getParentBeanFactory() != null) {
+</span><span class='line'>        return getParentBeanFactory().getBean(requiredType);
+</span><span class='line'>    }
+</span><span class='line'>    else {
+</span><span class='line'>        throw new NoSuchBeanDefinitionException(requiredType, "expected single bean but found " +
+</span><span class='line'>                beanNames.length + ": " + StringUtils.arrayToCommaDelimitedString(beanNames));
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Сразу же бросается в глаза некий утилитарный класс <code>Assert</code>, который лишь визуально напоминает конструкцию языка java <code>assert</code>. На этом сходство заканчивается, т.к. внутри все те же стандартные java исключения типа <code>IllegalArgumentException</code>. С помощью метода <code>getBeanNamesForType</code> получается массив всех имен бинов из реестра и отбираются только те, которые соответствуют по типу и другим логическим параметрам, что, к примеру, не позволяет создавать бины из абстрактных классов. Далее, если не нашлось ни одного имени, то пытаемся получить бин из родительской фабрики бинов. <code>parentBeanFactory</code> задается в конструкторе фабрики при её создании. Если имен бинов найдено несколько, то значит конфиг некорректен. И тем не менее пытаемся в данном случае сузить круг поиска только бинами, которые помечены как внедряемые в другие классы.</p>
+
+
+
+
+<p>Теперь, когда у нас есть имя бина и его тип, мы можем попытаться получить экземпляр бина. Метод создания бина достаточно большой (135 строк без сторонних используемых методов), поэтому покажу только кусочки. В первую очередь пытаемся получить объект, если это singleton и он был загружен ранее. Т.к. объект бина может быть фабрикой, то идет проверка на соответствие интерфейсу <code>FactoryBean</code>. Если это действительно фабрика, то вызывается ее фабричный метод.</p>
+
+
+
+
+<p>Порадовала проверка на параллельный запуск создания одного и того же бина в одном потоке. </p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (isPrototypeCurrentlyInCreation(beanName)) {
+</span><span class='line'>    throw new BeanCurrentlyInCreationException(beanName);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Таким образом предотвращаются циклические ссылки. Статус создания того или иного бина хранится в NamedThreadLocal переменной. </p>
+
+
+
+
+<blockquote>
+Далее идут иерархические хитросплетения, которые сводятся к одному, к библиотке <a href="http://cglib.sourceforge.net/" rel="nofollow">CGLib</a>. С помощью неё создаются бины в spring&#8217;e.
+</blockquote>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Прицельный обзор: Как работает Dependency Injection в Spring Framework]]></title>
+    <link href="http://knowlix.github.io/blog/2012/07/09/spring-di/"/>
+    <updated>2012-07-09T00:37:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/07/09/spring-di</id>
+    <content type="html"><![CDATA[<p>Для того, чтобы ответить на этот вопрос, нужно определить точку входа. Для начала организуется контекст приложения - вручную для стандартных приложений или автоматически при использовании <em>Spring</em>&#8216;а в Web. Сразу хочу отметить, <a href="http://www.springsource.org/spring-framework/" rel="nofollow">Spring Framework</a> отличается высоким уровнем абстракции. Немалая часть реализации организуется путем глубокого наследования (5-6 уровней). Так <code>ApplicationContext</code> компонует в себе общий функционал по работе с состоянием приложения путем реализации нескольких интерфейсов. Затем, делая cast к тому или иному интерфейсу, можно работать с определенным функционалом. К примеру:</p>
+
+
+
+
+<!--more-->
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ApplicationContext context = new ClassPathXmlApplicationContext("spring-config.xml");
+</span><span class='line'>BeanFactory beanFactory = context;
+</span><span class='line'>PrintService printService = (PrintService) beanFactory.getBean("printService");
+</span><span class='line'>printService.print();</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Во время создания контекста приложения инициируется его конфигурация, где описываются бины или пакеты, в которых стоит их искать, после чего создаются все связанные компоненты. В терминах Spring&#8217;а выполняется refresh контекста. Создается фабрика bean&#8217;ов, определяются post processor&#8217;ы фабрики. Дело в том, что бины загружаются при старте приложения в память. Они конфигурируются через component-scan директиву в xml или напрямую директивой bean. Все начинается с парсинга конфига с помощью <code>ConfigurationClassPostProcessor</code>&#8216;а. Создается парсер конфига <code>ConfigurationClassParser</code> и вызывается его метод <code>parse</code>. Отдельные объекты обрабатывают разные директивы конфига и загружают бины с помощью reflection&#8217;а. BeanFactory реализует интерфейс BeanDefinitionRegistry, который описывает структуру объекта для доступа к найденным бинам. Этот объект наполняется через <code>ConfigurationClassParser</code>.</p>
+
+
+
+
+<p>Метод <code>beanFactory.getBean("printService")</code> просто получает экземпляр проинициализированного бина из Map&#8217;ы.</p>
+
+
+
+
+<p>DI базируется на трех частях <em>Spring</em>&#8216;а - <em>Core</em>, <em>Context</em>, <em>Beans</em>. Куча абстракции, наследования. Используются крупные объекты, реализующие разные функциональные роли. Все это немного усложняет копание в Spring&#8217;e. Спасает хороший JavaDoc.</p>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Mockito: Обработка методов]]></title>
+    <link href="http://knowlix.github.io/blog/2012/07/06/mockito-methods-interception/"/>
+    <updated>2012-07-06T00:10:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/07/06/mockito-methods-interception</id>
+    <content type="html"><![CDATA[<p>Вместе с mock&#8217;ом создается обработчик его событий. Это один обработчик на все методы мока. В итоге, мы имеем объект класса <code>MockHandlerImpl</code>, который обернут wrapper&#8217;ами.</p>
+
+
+
+
+<!--more-->
+
+
+
+
+<p>В момент вызова метода mock объекта вызывается <code>MockHandlerImpl#handle</code>. Но этот метод вызывается не напрямую а из объекта <code>MethodInterceptor</code>. Именно с этими обработчиками работает созданный <em>CGLib</em> библиотекой proxy объект. В <a href="https://code.google.com/p/mockito/" rel="nofollow">Mockito</a> есть собственная реализация <code>MethodInterceptor</code> - <code>MethodInterceptorFilter</code>, которая хранит внутри себя обработчик <code>MockHandlerImpl</code> и настройки вызова. Итак, что же происходит в момент вызова метода mock объекта? Вызывается метод <code>MethodInterceptorFilter#intercept</code>, куда передается ссылка на объект, в котором был вызван метод, ссылка на объект вызванного метода, массив переданных аргументов и объект <code>MethodProxy</code>, который позволяет получить ссылку на реальный метод mock объекта. <code>MethodInterceptorFilter</code> отделяет реализацию получения необходимых параметров вызова от самого обработчика. Далее все эти параметры помещаются в независимый от механизма создания proxy класс <code>Invocation</code>. Этот объект передается методу обработчика <code>MockHandlerImpl#handle</code>, который выполняет основную логику стаббированных методов.</p>
+
+
+
+
+<p>Стоит понимать, что в Mockito есть как минимум 3 ситуации, когда вызов метода одного и того же mock объекта должен интерпретироваться по разному:</p>
+
+
+
+
+<ol class="enum">
+    <li>в конструкции <code>when(mock.method(matcher))</code></li>
+    <li>в конструкции <code>verify(mock).method(matcher)</code></li>
+    <li>прямой вызов <code>mock.method(args...)</code> в тестируемом объекте</li>
+</ol>
+
+
+
+
+<p>В обработчике(метод <code>handle</code>) обрабатываются все эти ситуации. В одной из статей мы уже рассматривали объекты ответов - <code>Answer</code>, которые определяются в конструкции when. В конструкции verify хранятся условия проверки. Плюс ко всему, есть matcher&#8217;ы, которые тоже накапливаются. Есть и другие параметры, которые должны быть переданы в обработчик. Странное решение, размывающее логику обработчика - это хранение этих артефактов в singleton объектах, доступ к которым имеют все компоненты системы одновременно. Основным таким объектом является MockingProgress. Этот объект мы уже рассматривали со стороны оповещения слушателей о событии создания mock&#8217;а. Он хранит в себе настройки verify блока и список matcher&#8217;ов. Плюс ко всему, т.к. эти объекты по большому счету нужны только в момент обработки stub&#8217;а, то нужно следить чтобы хранимые объекты не попали случайно в другой stub, поэтому Mockito хранит текущее состояние процесса стаббинга. Состояние определяется по наличию тех или иных объектов в реализации <code>MockingProgress</code>. К примеру, если объект <code>VerificationMode</code> не null, то объект в состоянии проверки. После извлечения хранимых объектов в них проставляется null, и объект готов к следующим процессам. Под процессом над стаббированным методом понимается один из трех процессов перечисленных в списке вызова обработчика метода mock&#8217;а выше в статье.</p>
+
+
+
+
+<p>В каждом MockHandler&#8217;е создается InvocationContainer, который хранит в себе все ответы. В этот же контейнер переносятся все matcher&#8217;ы при их обработке. Этот же объект хранит информацию, которая проверяется в VerificationMode. Если задан VerificationMode, то выполняется проверка. Иначе вызывается метод инкрементирующий статистические данные о вызове методов.</p>
+
+
+
+
+<blockquote>
+    Стоит заметить, что matcher&#8217;ы - объекты, которые позволяют задавать аргументы стаббируемых методов в виде выражений, реализуются на базе библиотеки <a href="http://code.google.com/p/hamcrest" rel="nofollow">Hamcrest</a>. Насколько я знаю, многие тестирующие framework&#8217;и используют эту библиотеку. Mockito лишь расширяет её своими matcher&#8217;ами.
+</blockquote>
+
+
+
+
+<p>Далее вызывается поиск Answer объекта по объекту Invocation: </p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>StubbedInvocationMatcher stubbedInvocation = invocationContainerImpl.findAnswerFor(invocation);</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Где ищется соответствующий объект ответа для данного мока, для данного метода с аргумента, matcher которого соответствует переданным аргументам. Напомню, что вся эта информация хранится в объекте invocation с одной стороны и в объекте ответа(точнее в его обертке, которая используется во внутренней реализации) с другой.</p>
+
+
+
+
+<p>Если ответ найден, то он вызывается с передачей ему объекта invocation. Иначе получаем ответ по-умолчанию и вызываем его:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (stubbedInvocation != null) {
+</span><span class='line'>    stubbedInvocation.captureArgumentsFrom(invocation);
+</span><span class='line'>    return stubbedInvocation.answer(invocation);
+</span><span class='line'>} else {
+</span><span class='line'>    Object ret = mockSettings.getDefaultAnswer().answer(invocation);
+</span><span class='line'>    invocationContainerImpl.resetInvocationForPotentialStubbing(invocationMatcher);
+</span><span class='line'>    return ret;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Объект, возвращаемый ответом, и есть результат метода mock&#8217;а. Он и возвращается из функции.</p>
+
+
+
+
+<blockquote>        
+Это последняя статья цикла <em>Mockito</em>. Мы увидели и хардкод и дублирование и, возможно, неудачные архитектурные решения. Чего стоит абстрагирование создания mock объектов, где базовые общие классы тесно переплетены с логикой библиотки <a href="http://cglib.sourceforge.net/" rel="nofollow">CGLib</a>. Замена <em>CGLib</em> альтернативами не будет легким занятием. Но вместе с тем <em>Mockito</em> является типичным примером тестирующего framework&#8217;а, который позволяет понять принципы работы подобных библиотек.
+</blockquote>
+
+
+
+
+<p>Если остались вопросы, то не стесняйтесь их задавать в комментариях, twitter&#8217;e/Google Plus&#8217;e или по почте.</p>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Mockito: Как создаются mock'и]]></title>
+    <link href="http://knowlix.github.io/blog/2012/06/30/mockito-mocks-creating/"/>
+    <updated>2012-06-30T21:17:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/06/30/mockito-mocks-creating</id>
+    <content type="html"><![CDATA[<p>Работа с <a href="https://code.google.com/p/mockito/" rel="nofollow">Mockito</a> начинается, как ни странно, с класса <code>org.mockito.Mockito</code>. Этот класс содержит в себе несколько статичных методов, которые обычно и импортируются в тест-класс. Первое же, что бросается в глаза, это огромные JavaDoc комментарии. Разработчики решили вести настоящий Tutorial прямо в коде. Обнаружить код среди такого обилия комментариев без использования инструментов IDE весьма непросто. Класс <em>Mockito</em> делегирует все вызовы классу <code>org.mockito.internal.MockitoCore</code>. Если класс <em>Mockito</em> - точка входа внешнего API, то <code>MockitoCore</code> - точка входа во внутреннюю реализацию проекта. </p>
+
+
+
+
+<!--more-->
+
+
+
+
+<p>Создание mock объекта начинается с вызова метода <code>mock(Class&lt;T&gt; typeToMock, MockSettings settings)</code>, где</p>
+
+
+
+
+<ul class="enum">
+    <li>typeToMock - класс типа будущего mock&#8217;а</li>
+    <li>settings - настройки mock&#8217;a</li>
+</ul>
+
+
+
+
+<p>Типичный вызов создания мока выглядит так:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Mockito.mock(SomeClass.class)</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>При этом настройки mock&#8217;а инициализируются по умолчанию с помощью метода <code>Mockito.withSettings()</code>, который возвращает реализацию интерфейсов настроек. А интерфейсов класса с настройками mock объектов два - <code>org.mockito.MockSettings</code> и <code>org.mockito.mock.MockCreationSettings</code>. Первый определяет методы установки параметров mock&#8217;ов, второй определяет интерфейс для доступа к этим параметрам без возможности их изменения. Соответственно, запись значений в объект производится через первый интерфейс, а все остальные классы работают с параметрами через второй интерфейс, чтобы ничего в нем случайно не изменить. Настройки можно задавать вручную при создании mock объекта. В частности можно указать произвольное имя mock&#8217;а, чтобы логи выполнения тестов стали понятнее.</p>
+
+
+
+
+<p>При создании mock&#8217;а, все его методы stubb&#8217;ируются. Результат вызова метода определяется Answer объектом. Для важных методов тестирования мы задаем <code>Answer</code> объект вручную через конструкцию <code>Mockito.when(Matcher).thenAnswer(Answer)</code>, для других же объектов вызывается <code>Answer</code> по умолчанию. Конкретная реализация ответа также определяется в настройках mock&#8217;а и её можно переопределить. В настройках по умолчанию используется <code>org.mockito.internal.stubbing.defaultanswers.GloballyConfiguredAnswer</code>. Этот ответ в свою очередь делегирует запрос реализации ответа, которая определена в глобальном объекте конфигурации, который был рассмотрен в статье <a href="http://queuepy.com/blog/2012/06/26/mockito-init-mocks/">Mockito: Обработка аннотаций</a>. В конфигурации же определена реализация <code>org.mockito.internal.stubbing.defaultanswers.ReturnsEmptyValues</code>, которая возвращает пустые значения для разных типов объектов.</p>
+
+
+
+
+<p>Помимо <code>GloballyConfiguredAnswer</code>, в <em>Mockito</em>, реализовано ещё несколько реализаций ответов, ссылки на эти объекты хранятся в Enum&#8217;е <code>org.mockito.Answers</code>. Также в <em>Mockito</em> ещё имеются и внутренние реализации ответов, такие как <code>ReturnsEmptyValues</code> и <code>ReturnsMoreEmptyValues</code>. Последний делегирует запрос <code>ReturnsEmptyValues</code> и дополняет его логику определением еще нескольких типов данных. Дело в том, что <code>ReturnsEmptyValues</code> возвращает null для всех объектов, кроме определенных реализаций коллекций, примитивных типов и их оберток. В какой-то момент разработчики решили поддержать еще строки и массивы, но так как кто-то, скорее всего, успел написать тесты с учетом этой специфики, то просто обновить существующую реализацию уже недостаточно. Пришлось создавать новый тип ответа <code>ReturnsMoreEmptyValues</code>. Новый ответ сейчас используется в реализации ответа <code>ReturnsSmartNulls</code>, который вместо null пытается создать и вернуть mock&#8217;реализацию данного типа.</p>
+
+
+
+
+<p>Есть и другие внутренние реализации ответов, но в них нет ничего интересного. Так же имеется возможность задать в настройках объекты - слушатели, которые будут оповещены в момент вызова метода. Эти объекты реализуют интерфейс <code>org.mockito.MockSettings.InvocationListener</code>.</p>
+
+
+
+
+<p>Помимо прочего, базовый класс настроек имеет метод самопроверки, который в аргументе принимает класс объекта, mock которого планируется создать, и проверяет возможность создания mock&#8217;а с данными настройками. В случае успешной проверки создается новый экземпляр объекта настроек, куда устанавливается объект имени mock&#8217;а и обработанные настройки, определенные раннее. Объект имени мока с интерфейсом <code>org.mockito.internal.util.MockName</code> служит для хранения имени мока и для выполнения некоторых операций по обработке имени мока.</p>
+
+
+
+
+<p>Основной объект системы, выполняющий создание объекта, реализует интерфейс <code>org.mockito.plugins.MockMaker</code>, но напрямую с этим объектом работает только утилитарный класс <code>org.mockito.internal.util.MockUtil</code>. Именно метод <code>createMock</code> класса <code>MockUtil</code> вызывается в <code>MockitoCore#mock</code>. В первую очередь создается объект с интерфейсом <code>org.mockito.invocation.MockHandler</code>, который перехватывает вызов стаббированных методов в mock объекте. Объекты перехватчиков создаются фабрикой <code>org.mockito.internal.handler.MockHandlerFactory</code>. Создается базовая реализация обработчика <code>org.mockito.internal.handler.MockHandlerImpl</code> и оборачивается разными wrapper&#8217;ами (паттерн <em>Wrapper</em>) для навешивания дополнительного функционала. На данный момент используются следующие обертки:</p>
+
+
+
+
+<ul class="enum">
+    <li><code>org.mockito.internal.handler.NullResultGuardian</code> для предотвращения возвращения null&#8217;овых значений из методов, которые возвращают примитивные типы или их обертки.</li>
+
+    <li><code>org.mockito.internal.handler.MockHandlerFactory</code> оповещает слушателей, объявленных в настройках о вызове метода.</li>
+</ul>
+
+
+
+
+<p>Далее вызывается метод <code>MockMaker#createMock</code>, куда передаются настройки и <code>MockHandler</code>. Объект <code>MockMaker'а</code> создается в статичном поле класса <code>MockUtil</code> с помощью <code>ClassPathLoader</code>, который уже использовался для загрузки пользовательской реализации класса конфигурации. Метод <code>СlassPathLoader#getMockMaker</code> возвращает заранее загруженную реализацию <code>MockMaker'a</code>. Так же как и с объектом конфигурации, имеется возможность использовать свою реализацию <code>MockMaker'а</code>, но принцип загрузки отличается:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>static &lt;T> List&lt;T> loadImplementations(Class&lt;T> service) {
+</span><span class='line'>    ClassLoader loader = Thread.currentThread().getContextClassLoader();
+</span><span class='line'>    if (loader == null) {
+</span><span class='line'>        loader = ClassLoader.getSystemClassLoader();
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    Enumeration&lt;URL> resources;
+</span><span class='line'>    try {
+</span><span class='line'>        resources = loader.getResources("mockito-extensions/" + service.getName());
+</span><span class='line'>    } catch (IOException e) {
+</span><span class='line'>        throw new MockitoException("Failed to load " + service, e);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    List&lt;T> result = new ArrayList&lt;T>();
+</span><span class='line'>    for (URL resource : Collections.list(resources)) {
+</span><span class='line'>        InputStream in = null;
+</span><span class='line'>        try {
+</span><span class='line'>            in = resource.openStream();
+</span><span class='line'>            for (String line : readerToLines(new InputStreamReader(in, "UTF-8"))) {
+</span><span class='line'>                String name = stripCommentAndWhitespace(line);
+</span><span class='line'>                if (name.length() != 0) {
+</span><span class='line'>                    result.add(service.cast(loader.loadClass(name).newInstance()));
+</span><span class='line'>                }
+</span><span class='line'>            }
+</span><span class='line'>        } catch (Exception e) {
+</span><span class='line'>            throw new MockitoConfigurationException(
+</span><span class='line'>                    "Failed to load " + service + " using " + resource, e);
+</span><span class='line'>        } finally {
+</span><span class='line'>            closeQuietly(in);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    return result;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>С помощью ClassLoader&#8217;a загружается файл с именем класса, переданного в аргументе <code>service</code>. На данный момент в качестве service используется класс <code>MockMaker</code>. Файл ищется в папке с именем &#8220;mockito-extensions&#8221;. В файле указываются полные имена классов - один класс на строчку. Далее эти классы загружаются и создаются их объекты. Несмотря на возможность загрузить несколько <code>MockMaker'ов</code>, будет применен только первый найденный. Если пользовательских классов нет, то загружается <code>MockMaker</code> по умолчанию <code>org.mockito.internal.creation.CglibMockMaker</code>.</p>
+
+
+
+
+<blockquote>
+Создание прокси классов, а mock объекты фактически ими и являются, по умолчанию обеспечивается библиотекой <a href="http://cglib.sourceforge.net/">CGLib</a>. Исходники этой библиотеки включены в проект, чтобы не заморачиваться с версией проекта и перепаковкой исходников. Конечно, <em>Maven</em> облегчил бы задачу и структура проекта стала бы яснее, но что сделано, то сделано. Разработчики не модифицируют эти исходники и в целом это запрещается. <em>CGLib</em> - библиотека, позволяющая создавать, расширять классы и интерфейсы в runtime&#8217;e.
+</blockquote>
+
+
+
+
+<p>Внутри <code>MockMaker</code>&#8216;a обработчик вызова стаббированных методов - <code>MockHandler</code> оборачивается внутрь класса <code>MethodInterceptorFilter</code>, реализующего интерфейс <code>MethodInterceptor</code>, который является частью <em>CGLib</em> библиотеки.</p>
+
+
+
+
+<p>Как ни странно, логика создания объектов с использованием <em>CGLib</em> размыта и описана в неком утилитарном классе <code>org.mockito.internal.creation.jmock.ClassImposterizer</code>, который уже использовался при проверке настроек mock&#8217;объекта. Этот класс позаимствован из библиотеки <a href="http://www.jmock.org/">jMock</a>.</p>
+
+
+
+
+<blockquote>
+#Thanks to jMock guys for this handy class that wraps all the cglib magic.
+</blockquote>
+
+
+
+
+<p>Кстати, это не единственный класс в <em>Mockito</em> с похожим комментарием.</p>
+
+
+
+
+<p>Этот класс вносит разнородность в <em>Mockito</em>, что очень некрасиво. Например, для создания экземпляров классов используется библиотека <a href="http://code.google.com/p/objenesis/">objenesis</a>. В <em>Mockito</em> же эта процедура выполняется напрямую, с помощью рефлексии.</p>
+
+
+
+
+<p>В первую очередь устанавливается видимость конструкторов, класс для которого создается Mock объект. Это мы уже проходили. Решается парой методов рефлексии. Далее создается класс proxy объекта. Эта работа выполняется с помощью <em>CGLib</em> класса <code>Enhancer</code>. Этот класс конструирует класс для будущего proxy по параметрам, которые мы в него передали.</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private Class&lt;?> createProxyClass(Class&lt;?> mockedType, Class&lt;?>...interfaces) {
+</span><span class='line'>    if (mockedType == Object.class) {
+</span><span class='line'>        mockedType = ClassWithSuperclassToWorkAroundCglibBug.class;
+</span><span class='line'>    }
+</span><span class='line'>    
+</span><span class='line'>    Enhancer enhancer = new Enhancer() {
+</span><span class='line'>        @Override
+</span><span class='line'>        @SuppressWarnings("unchecked")
+</span><span class='line'>        protected void filterConstructors(Class sc, List constructors) {
+</span><span class='line'>            // Don't filter
+</span><span class='line'>        }
+</span><span class='line'>    };
+</span><span class='line'>    enhancer.setClassLoader(SearchingClassLoader.combineLoadersOf(mockedType));
+</span><span class='line'>    enhancer.setUseFactory(true);
+</span><span class='line'>    if (mockedType.isInterface()) {
+</span><span class='line'>        enhancer.setSuperclass(Object.class);
+</span><span class='line'>        enhancer.setInterfaces(prepend(mockedType, interfaces));
+</span><span class='line'>    } else {
+</span><span class='line'>        enhancer.setSuperclass(mockedType);
+</span><span class='line'>        enhancer.setInterfaces(interfaces);
+</span><span class='line'>    }
+</span><span class='line'>    enhancer.setCallbackTypes(new Class[]{MethodInterceptor.class, NoOp.class});
+</span><span class='line'>    try {
+</span><span class='line'>        return enhancer.createClass(); 
+</span><span class='line'>    } catch (CodeGenerationException e) {
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Я опустил некоторые моменты по управлению секьюрностью классов и обработки исключения. Они незначительны.</p>
+
+
+
+
+<p>Для начала решаем проблему с багом <em>CGLib</em>, который отказывается обрабатывать класс <code>Object</code>, так как где-то, видимо, завязывается на родителе класса. Т.е. если тип mock объекта - <code>Object</code>, то мы создаем пустой объект <code>ClassWithSuperclassToWorkAroundCglibBug</code>, с которым дальше работаем. Затем создаем объект <code>Enhancer'a</code>, и ему передаются classloader&#8217;ы классов будущих mock&#8217;ов, обернутых во внутренний класс <em>CGLib</em> для работы со всеми найденными classloader&#8217;ами как с одним. Класс, помимо прочего, будет реализовывать интерфейс <code>Factory</code>, который определяет методы установки обработчиков вызовов методов и инстанцирования этих объектов. Это внутренняя особенность <em>CGLib</em>. Далее указываем <code>Enhancer'у</code> типы классов и интерфейсов, которые он должен будет унаследовать, и типы обработчиков-перехватчиков методов классов. В данном случае это стандартные классы <code>MethodInterceptor</code>, который позволяет определять обработчики, и <code>NoOp</code>, который передает управление методам объекта напрямую - нужно для <code>Spy</code> моков.</p>
+
+
+
+
+<p>Следующим шагом создается объект прокси:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private Object createProxy(Class&lt;?> proxyClass, final MethodInterceptor interceptor) {
+</span><span class='line'>    Factory proxy = (Factory) objenesis.newInstance(proxyClass);
+</span><span class='line'>    proxy.setCallbacks(new Callback[] {interceptor, SerializableNoOp.SERIALIZABLE_INSTANCE });
+</span><span class='line'>    return proxy;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Как видно, objensis намного упрощает создание объектов. У разработчиков, видимо, не доходят руки, чтобы переписать старый код с использованием этой библиотеки. В качестве обработчиков событий указываем созданный ранее InternalMockHandler и пустую реализацию интерфейса NoOp.</p>
+
+
+
+
+<p>Теперь остается только оповестить все компоненты системы о событии создания мока:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>mockingProgress.mockingStarted(mock, typeToMock);</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>и вернуть его в класс-тест.</p>
+
+
+
+
+<p>Хочу заметить, что в коде немало хардкода. Немало мест, где метод принимает параметры по общему интерфейсу, а внутри метода проверяется объект на соответствие определенному типу, который реализует этот интерфейс:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private InternalMockHandler cast(MockHandler handler) {
+</span><span class='line'>    if (!(handler instanceof InternalMockHandler)) {
+</span><span class='line'>        throw new MockitoException("At the moment you cannot provide own implementations of MockHandler." +
+</span><span class='line'>                "\nPlease see the javadocs for the MockMaker interface.");
+</span><span class='line'>    }
+</span><span class='line'>    return (InternalMockHandler) handler;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Но стоит отдать разработчикам должное за заботу о пользователях - расширяя проект, они стараются не менять старую часть API. Обидно было бы переписывать кучу тестов при переходе на новую версию <em>Mockito</em>.</p>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Mockito: @InjectMocks]]></title>
+    <link href="http://knowlix.github.io/blog/2012/06/29/mockito-inject-mocks/"/>
+    <updated>2012-06-29T00:33:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/06/29/mockito-inject-mocks</id>
+    <content type="html"><![CDATA[<p>Процесс внедрения mock&#8217;ов разделен на несколько этапов:</p>
+
+
+
+
+<ol class="enum">
+    <li>Поиск полей, отмеченных аннотацией <code>@InjectMocks</code></li>
+    <li>Поиск мок объектов в тесте</li>
+    <li>Внедрение найденных моков в поля, помеченные аннотацией <code>@InjectMocks</code></li>
+</ol>
+
+
+
+
+<!--more-->
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Set&lt;Field> mockDependentFields = new HashSet&lt;Field>();
+</span><span class='line'>Set&lt;Object> mocks = newMockSafeHashSet();
+</span><span class='line'>        
+</span><span class='line'>while (clazz != Object.class) {
+</span><span class='line'>    new InjectMocksScanner(clazz).addTo(mockDependentFields);
+</span><span class='line'>    new MockScanner(testClassInstance, clazz).addPreparedMocks(mocks);
+</span><span class='line'>    clazz = clazz.getSuperclass();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>В <a href="https://code.google.com/p/mockito/" rel="nofollow">Mockito</a> используется собственный утилитарный класс <code>Sets</code>, с помощью которого создаются внутренние реализации множеств. В данном случае заимпортирован один из его статичных методов newMockSafeHashSet. Метод создает реализацию под названием <code>org.mockito.internal.util.collections.HashCodeAndEqualsSafeSet</code>. Создана отдельная реализация <code>Set</code> интерфейса лишь для того, чтобы скрыть особенность реализации моков. А именно, есть некоторая проблема в стаббинге методов <code>Object.equals</code> и <code>Object.hashCode</code>, и они могут выкидывать <code>NullPointerException</code>. Истинную причину выясним при разборе процесса subbing&#8217;а. При работе в коллекциях эти методы интенсивно используются при поиске и добавлении элементов, поэтому мы оборачиваем мок объект в этот wrapper, который использует свои методы <code>equals</code> и <code>hashCode</code>. Оборачивание моков происходит в момент добавления элементов в множество.</p>
+
+
+
+
+<p>Вернемся к примеру. В множество mocks у нас будут добавлены все найденные mock-объекты. Стоит заметить, что в Mockito много переменных модифицируются, будучи переданными через аргументы. Так и в данном случае коллекции наполяются именно так. Immutability здесь явно не хватает. <code>org.mockito.internal.configuration.injection.scanner.InjectMocksScanner</code> реализует алгоритм поиска полей, отмеченных аннотацией <code>@InjectMocks</code>. Основные два метода класса:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private Set&lt;Field> scan() {
+</span><span class='line'>    Set&lt;Field> mockDependentFields = new HashSet&lt;Field>();
+</span><span class='line'>    Field[] fields = clazz.getDeclaredFields();
+</span><span class='line'>    for (Field field : fields) {
+</span><span class='line'>        if (null != field.getAnnotation(InjectMocks.class)) {
+</span><span class='line'>            assertNoAnnotations(field, Mock.class, MockitoAnnotations.Mock.class, Captor.class);
+</span><span class='line'>            mockDependentFields.add(field);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    return mockDependentFields;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void assertNoAnnotations(final Field field, final Class... annotations) {
+</span><span class='line'>    for (Class annotation : annotations) {
+</span><span class='line'>        if (field.isAnnotationPresent(annotation)) {
+</span><span class='line'>            new Reporter().unsupportedCombinationOfAnnotations(annotation.getSimpleName(), InjectMocks.class.getSimpleName());
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Именно результат метода scan и добавляет в наше множество. В цикле пробегаем по полям класса-теста, проверяем есть ли у поля аннотация <code>@InjectMocks</code>. Стоит отметить, что используются системные java классы полей и классов. Пока, по-моему, ничего сверхъестественного. Далее, если метод аннотирован, то проверяем не аннотирован ли он еще и стаббирующими аннотациями (<code>@Mock</code>, <code>@Captor</code>), т.к. это противоречит логике и не может быть допущено. В случае нарушения правил выбрасывается <code>RuntimeException</code>. Если все в порядке, то мы можем добавить поле в наше множество.</p>
+
+
+
+
+<p><code>org.mockito.internal.configuration.injection.scanner.MockScanner</code> реализуется второй этап алгоритма внедрения моков - поиск мок объектов в тесте. Основные методы класса:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private Set&lt;Object> scan() {
+</span><span class='line'>    Set&lt;Object> mocks = newMockSafeHashSet();
+</span><span class='line'>    for (Field field : clazz.getDeclaredFields()) {
+</span><span class='line'>        // mock or spies only
+</span><span class='line'>        FieldReader fieldReader = new FieldReader(instance, field);
+</span><span class='line'>
+</span><span class='line'>        Object mockInstance = preparedMock(fieldReader.read(), field);
+</span><span class='line'>        if (mockInstance != null) {
+</span><span class='line'>            mocks.add(mockInstance);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    return mocks;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private Object preparedMock(Object instance, Field field) {
+</span><span class='line'>    if (isAnnotatedByMockOrSpy(field)) {
+</span><span class='line'>        return instance;
+</span><span class='line'>    } else if (isMockOrSpy(instance)) {
+</span><span class='line'>        mockUtil.maybeRedefineMockName(instance, field.getName());
+</span><span class='line'>        return instance;
+</span><span class='line'>    }
+</span><span class='line'>    return null;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private boolean isAnnotatedByMockOrSpy(Field field) {
+</span><span class='line'>    return null != field.getAnnotation(Spy.class)
+</span><span class='line'>            || null != field.getAnnotation(Mock.class)
+</span><span class='line'>            || null != field.getAnnotation(MockitoAnnotations.Mock.class);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private boolean isMockOrSpy(Object instance) {
+</span><span class='line'>    return mockUtil.isMock(instance)
+</span><span class='line'>            || mockUtil.isSpy(instance);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Класс выполнен в стиле <code>InjectMocksScanner</code>, хотя общего интерфейса у классов нет. Но это не страшно, т.к. выполняют они сугубо утилитарные функции. Результат метода scan помещается в множество найденных мок объектов для внедрения. За чтение значений полей класса из конкретных объектов отвечает FieldReader. Основная строчка его метода read:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>return field.get(target)</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p><p>В методе <code>MockScanner#preparedMock</code> определяется, является ли полученный из поля объект mock&#8217;ом. Определяется он по наличию в поле аннотаций <code>@Mock</code> или <code>@Spy</code>. Если аннотаций нет, то есть вероятность, что объекты были стаббированы вручную. Это проверяется в методе <code>MockScanner#isMockOrSpy</code>. В случае, если объект все-таки является <em>Mock</em> объектом, то возможно требуется его переименование. Необходимость такого решения возможно выяснится позднее, когда мы разберем процесс создания <em>Mock</em> объектов. На данный момент это выглядит каким то костылем.</p>
+
+<p><p>Осталось дело за малым - внедрить мок-объекты. Отправная точка <code>org.mockito.internal.configuration#DefaultInjectionEngine</code> - объект, который инициализирует обработчиков-внедренцев. И запускает процесс инжектирования. Внедрением занимаются <code>org.mockito.internal.configuration.injection.MockInjectionStrategy</code> объекты. На данный момент моки инжектируются через конструктор (<code>ConstructorInjection</code>), поля класса и сеттеры (<code>PropertyAndSetterInjection</code>).</p></p>
+
+<p><blockquote></p>
+
+<pre><code>Поле, помеченное аннотацией @InjectMocks, может быть помечено ещё и аннотацией @Spy, что заставляет, в случае неуспешного внедрения моков в объект, создавать из него Spy-объект. Хотя в целом JavaDoc полный, этот факт скрыт от глаз пользователей.
+</code></pre>
+
+<p></blockquote></p>
+
+<p><p>Для обработки <code>@Spy</code> аннотации, если не получилось создать объект, в который внедрялись моки, используется <code>SpyOnInjectedFieldsHandler</code>. Основной метод <code>DefaultInjectionEngine</code> - <code>#injectMocksOnFields</code>:</p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void injectMocksOnFields(Set&lt;Field> needingInjection, Set&lt;Object> mocks, Object testClassInstance) {
+</span><span class='line'>    MockInjection.onFields(needingInjection, testClassInstance)
+</span><span class='line'>            .withMocks(mocks)
+</span><span class='line'>            .tryConstructorInjection()
+</span><span class='line'>            .tryPropertyOrFieldInjection()
+</span><span class='line'>            .handleSpyAnnotation()
+</span><span class='line'>            .apply();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>Как видно, объект-конфигуратор процесса внедрения - <code>org.mockito.internal.configuration.injection.MockInjection</code>. Он определяет внутри себя реализации той или иной стратегии. Поэтому его методы <code>tryConstructorInjection</code>, <code>tryPropertyOrFieldInjection</code> и <code>handleSpyAnnotation</code> возвращают именно те классы стратегий, которые мы рассмотрели выше. Метод <code>onFields</code> возвращает объект <code>OngoingMockInjection</code> - внутренний класс класса <code>MockInjection</code>. Его тип нас не должен интересовать, т.к. проектировался этот объект для использования здесь и сейчас в виде Builder&#8217;а, что обеспечивается возвращением из каждого его метода ссылки на самого себя. Этот объект-builder сохраняет в конструкторе поля с аннотацией <code>@InjectMocks</code>. Далее метод withMocks сохраняет список mock объектов. Странный подход к инициализации базовых данных. Практичнее было бы внести сохранение списка mock объектов в конструктор, т.к. инжектирование без них смысла не имеет. А так как порядок выполнения Builder методов не регулируется, то можно пропустить этот метод. Далее 3&#8217;мя следующими методами объявляем стратегии инжектирования, которые хотим использовать. Стратегии инжектирования образуют цепочку стратегий по примеру паттерна Composite. Вызывая основной метод первого из них, он обрабатывает основную логику, затем вызывается аналогичный метод связанного с ним объекта-внедренца. И так до последнего. На практике это реализуется следующим образом:</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private MockInjectionStrategy injectionStrategies = MockInjectionStrategy.nop();</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>В <code>OngoingMockInjection</code> создается поле с пустой стратегией обработчиком, где nop() - фабричный метод возвращающий пустую реализацию:</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static final MockInjectionStrategy nop() {
+</span><span class='line'>    return new MockInjectionStrategy() {
+</span><span class='line'>        protected boolean processInjection(Field field, Object fieldOwner, Set&lt;Object> mockCandidates) {
+</span><span class='line'>            return false;
+</span><span class='line'>        }
+</span><span class='line'>    };
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p><code>processInjection</code> - основной абстрактный метод MockInjectionStrategy, в котором определяется логика внедрения моков. Методы добавления следующего в цепочке обработчика выглядят следующим образом:</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public OngoingMockInjection tryConstructorInjection() {
+</span><span class='line'>    injectionStrategies.thenTry(new ConstructorInjection());
+</span><span class='line'>    return this;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public OngoingMockInjection tryPropertyOrFieldInjection() {
+</span><span class='line'>    injectionStrategies.thenTry(new PropertyAndSetterInjection());
+</span><span class='line'>    return this;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>Где метод <code>thenTry</code> передает добавляемый объект следующему в цепочке объекту, пока не будет достигнут последний объект в цепочке. Он то и примет к себе новое звено:</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public MockInjectionStrategy thenTry(MockInjectionStrategy strategy) {
+</span><span class='line'>    if(nextStrategy != null) {
+</span><span class='line'>        nextStrategy.thenTry(strategy);
+</span><span class='line'>    } else {
+</span><span class='line'>        nextStrategy = strategy;
+</span><span class='line'>    }
+</span><span class='line'>    return strategy;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>Метод <code>OngoingMockInjection#apply</code>, который завершает цепочку методов Builder&#8217;а, выполняет метод injectionStrategies.process, первого из цепочки стратегий обработки объекта для каждого поля, аннотированного <code>@InjectMocks</code>:</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public boolean process(Field onField, Object fieldOwnedBy, Set&lt;Object> mockCandidates) {
+</span><span class='line'>    if(processInjection(onField, fieldOwnedBy, mockCandidates)) {
+</span><span class='line'>        return true;
+</span><span class='line'>    }
+</span><span class='line'>    return relayProcessToNextStrategy(onField, fieldOwnedBy, mockCandidates);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>Где осуществляется вызов метода с логикой обработки, а затем в методе relayProcessToNextStrategy передается управление следующему объекту в цепи.</p></p>
+
+<p><p>Метод <code>OngoingMockInjection#handleSpyAnnotation</code> прикрепляет финальный обработчик <code>@Spy</code> аннотаций в другой <code>MockInjectionStrategy#nop()</code>, который также вызывается для каждого поля в методе apply после вызова цепочки стратегий внедрения.</p></p>
+
+<p><p>Рассмотрим алгоритм внедрения через конструктор:</p></p>
+
+<p><p>ConstructorInjection определяет внутри себя реализацию ConstructorArgumentResolver&#8217;а, где определяется алгоритм получения mock&#8217;ов из найденного заранее множества, которые могут быть приравнены к типам аргументов конструктора.</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Object[] resolveTypeInstances(Class&lt;?>... argTypes) {
+</span><span class='line'>    List&lt;Object> argumentInstances = new ArrayList&lt;Object>(argTypes.length);
+</span><span class='line'>    for (Class&lt;?> argType : argTypes) {
+</span><span class='line'>        argumentInstances.add(objectThatIsAssignableFrom(argType));
+</span><span class='line'>    }
+</span><span class='line'>    return argumentInstances.toArray();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>Где метод objectThatIsAssignableFrom перебирает множество mock объектов и ищет первое из них, которое удовлетворяет условию:</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>argType.isAssignableFrom(mock.getClass())</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>Выбор конструктора, определение его параметров и создание нового экземпляра класса для поля, аннотированного <code>@InjectMocks</code>, осуществляется в классе <code>org.mockito.internal.util.reflection.FieldInitializer</code>. Внутри определены две реализации <code>ConstructorInstantiator</code> для обработки - конструктор с параметрами и без параметров. В ConstructorInjection используется <code>ParameterizedConstructorInstantiator</code>, так как внедрение mock объектов в конструктор без параметров смысла не имеет. Соответственно, первое что делается - это проверка - не создан ли объект в целевом поле.</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private FieldInitializationReport acquireFieldInstance() throws IllegalAccessException {
+</span><span class='line'>    Object fieldInstance = field.get(fieldOwner);
+</span><span class='line'>    if(fieldInstance != null) {
+</span><span class='line'>        return new FieldInitializationReport(fieldInstance, false, false);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    return instantiator.instantiate();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>Значение объекта получается уже знакомым способом через метод get. Если объект уже в поле создан, то нет смысла идти дальше - возвращаем результат о неуспешном создании объекта. <code>FieldInitializationReport</code> - класс с данными результатов создания класса. <code>instantiator</code> - это и есть один из экземпляров <code>ConstructorInstantiator</code>. По методу <code>instantiate</code> выполняется основная логика поиска соответствующего конструктора и создания самого объекта. Основное содержание метода:</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>constructor = biggestConstructor(field.getType());
+</span><span class='line'>changer.enableAccess(constructor);
+</span><span class='line'>
+</span><span class='line'>final Object[] args = argResolver.resolveTypeInstances(constructor.getParameterTypes());
+</span><span class='line'>Object newFieldInstance = constructor.newInstance(args);
+</span><span class='line'>new FieldSetter(testClass, field).set(newFieldInstance);
+</span><span class='line'>
+</span><span class='line'>return new FieldInitializationReport(field.get(testClass), false, true);</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>С помощью метода <code>biggestConstructor</code> (кстати, неудачное название, т.к. не отражает действия) определяется конструктор с наибольшим количеством параметров. Реализация тривиальна.</p></p>
+
+<p><p>С помощью метода changer.enableAccess изменяем доступность конструктора:</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>constructor.setAccessible(true);</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p>При этом сохраняем старое значение accesible, чтобы вернуть его в конце метода в блоке finally:</p></p>
+
+<p><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>finally {
+</span><span class='line'>    if(constructor != null) {
+</span><span class='line'>        changer.safelyDisableAccess(constructor);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure></p>
+
+<p><p><code>argResolver</code> - реализация <code>ConstructorArgumentResolver</code>, которая определяется внутри <code>ConstructorInjection</code> (о нем мы говорили выше). С помощью него мы получаем массив mock объектов в нужном нам порядке и создаем с помощью них новый экземпляр класса целевого поля. <code>FieldSetter</code> - противоположность <code>FieldReader'а</code>. Вставляет значение в поле, при этом также меняя видимость поля. В конце возвращается <code>FieldInitializationReport</code> с отчетом об успешном создании объекта. В дальнейшем из этого объекта получится флаг <code>fieldWasInitializedUsingContructorArgs</code>,и если он равен <code>true</code>, то вызов следующих обработчиков в цепочке прекращается.</p></p>
+
+<p><p>Остальные обработчики работают по такому же принципу. Так что нет особого смысла их детально рассматривать.</p></p>
+
+<p><p>На этом рассмотрение аннотаций заканчивается. В комментариях отвечу на любые вопросы.</p></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Mockito: Обработка аннотаций]]></title>
+    <link href="http://knowlix.github.io/blog/2012/06/26/mockito-init-mocks/"/>
+    <updated>2012-06-26T21:33:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/06/26/mockito-init-mocks</id>
+    <content type="html"><![CDATA[<p>Как говорилось ранее, метод <code>MockitoAnnotations#initMocks</code> инициализирует объекты, аннотированные одной из ключевых аннотаций (<code>@Spy</code>, <code>@Mock</code>, <code>@Captor</code>, <code>@InjectMocks</code>). Сегодня мы увидим как обрабатываются аннотации. Архитектура должна быть гибкой, чтобы позволить удобно добавлять новые аннотации.</p>
+
+
+
+
+<!--more-->
+
+
+
+
+<p>В метод передается единственный аргумент - ссылка на объект теста. Именно по полям этого объекта будет произведен поиск аннотаций. Т.к. объект <code>MockitoAnnotations</code> является частью внешнего API <a href="https://code.google.com/p/mockito/" rel="nofollow">Mockito</a>, то любые аргументы должны быть проверены на <code>null</code>, что и сделано. В случае обнаружения <code>null</code> выкидывается <code>MockitoException</code>.</p>
+
+
+
+
+<blockquote>
+    В <em>Mockito</em> все исключения собраны в утилитарном объекте org.mockito.exceptions.Reporter, каждый метод которого выкидывает определенное исключение. Вообще сомнительное решение, но в данном случае (в методе initMocks этот подход проигнорирован и исключение выбрасывается напрямую).
+</blockquote>
+
+
+
+
+<p>Далее в методе инициализируется объект, реализующий интерфейс <code>org.mockito.configuration.AnnotationEngine</code>. Этот объект непосредственно ищет аннотации и вызывает создание соответствующего объекта. Различные реализации AnnotationEngine отвечают за разные группы аннотаций и, соответственно, подход к обработке этих групп отличается. </p>
+
+
+
+
+<p>Реализация <code>AnnotationEngine</code> определена в <code>org.mockito.internal.configuration.GlobalConfiguration</code>. Это объект, хранящий базовую конфигурацию системы. Переопределить настройки можно только создав свой собственный объект, реализующий интерфейс <code>org.mockito.internal.configuration.IMockitoConfiguration</code>. <em>Mockito</em> подцепит его автоматически, если назвать и расположить его так, чтобы его наименование соответствовало наименованию, которое хранится в публичном поле <code>org.mockito.internal.configuration.ClassPathLoader#MOCKITO_CONFIGURATION_CLASS_NAME</code>. На данный момент это &#8220;org.mockito.configuration.MockitoConfiguration&#8221;. За загрузку custom&#8217;ной конфигурации отвечает класс <code>ClassPathLoader</code>, который загружает её по захардкоденному наименованию. Вот так выглядит метод <code>GlobalConfiguration#createConfig</code>:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private IMockitoConfiguration createConfig() {
+</span><span class='line'>    IMockitoConfiguration defaultConfiguration = new DefaultMockitoConfiguration();
+</span><span class='line'>    IMockitoConfiguration config = new ClassPathLoader().loadConfiguration();
+</span><span class='line'>    if (config != null) {
+</span><span class='line'>        return config;
+</span><span class='line'>    } else {
+</span><span class='line'>        return defaultConfiguration;
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Таким образом, в случае отсутствия внешней конфигурации загружается конфигурация по умолчанию. Стоит отметить, что <code>GlobalConfiguration</code> является singletone&#8217;ом для объектов одного потока, т.к. реализация конфигурации хранится в <code>ThreadLocal</code> переменной класса <code>GlobalConfiguration</code>:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private static ThreadLocal&lt;IMockitoConfiguration> globalConfiguration = new ThreadLocal&lt;IMockitoConfiguration>();
+</span><span class='line'>
+</span><span class='line'>public GlobalConfiguration() {
+</span><span class='line'>    if (globalConfiguration.get() == null) {
+</span><span class='line'>        globalConfiguration.set(createConfig());
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<blockquote>
+    В <em>Mockito</em> способ использования единого экземпляра объекта с помощью ThreadLocal переменных очень распространен и используется повсеместно. Так как тесты, в подавляющем своем большинстве, запускаются в одном потоке, то этот способ работает.
+</blockquote>
+
+
+
+
+<p>В <code>DefaultMockitoConfiguration#getAnnotationEngine</code> возвращается <code>org.mockito.internal.configuration.InjectingAnnotationEngine</code> - реализация <code>AnnotationEngine</code>, обрабатывающая стаббирующие аннотации (<code>@Spy</code>, <code>@Mock</code>, <code>@Captor</code>) и внедряющая их объекты в <code>@InjectMocks</code> объект. </p>
+
+
+
+
+<blockquote>
+InjectingAnnotationEngine - делегат. Дело в том, что аннотации добавлялись постепенно. С появлением аннотации InjectMocks появилась необходимость работать с проинициализированными объектами. Разработчики решили использовать в такой ситуации создающие AnnotationEngine внутри инжектируемого. Таким образом, инжектирующий AnnotationEngine делегирует создающим AnnotationEngine обязанность по созданию объектов, а сам затем занимается уже внедрением этих объектов.
+</blockquote>
+
+
+
+
+<p>Таким образом, в <code>InjectingAnnotationEngine</code> присутствуют два <code>AnnotationEngine</code>, которым делегируется обработка старых аннотаций, а именно:</p>
+
+
+
+
+<ol class="enum">
+    <li><code>DefaultAnnotationEngine</code> обрабатывает аннотации <code>@Mock</code> и <code>@Captor</code></li>
+    <li><code>SpyAnnotationEngine</code> обрабатывает <code>@Spy</code> аннотации</li>
+</ol>
+
+
+
+
+<p>Сам же класс <code>InjectingAnnotationEngine</code> обрабатывает аннотации <code>@InjectMocks</code>.</p>
+
+
+
+
+<p>Основной метод <code>InjectingAnnotationEngine#process</code> сначала вызывает инициализацию стаббируемых объектов, делегируя эти функции другим реализациям, затем вторым шагом внедряет эти объекты в поле, аннотированное как <code>@InjectMocks</code>:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void processIndependentAnnotations(final Class&lt;?> clazz, final Object testInstance) {
+</span><span class='line'>    Class&lt;?> classContext = clazz;
+</span><span class='line'>    while (classContext != Object.class) {
+</span><span class='line'>        //this will create @Mocks, @Captors, etc:
+</span><span class='line'>        delegate.process(classContext, testInstance);
+</span><span class='line'>        //this will create @Spies:
+</span><span class='line'>        spyAnnotationEngine.process(classContext, testInstance);
+</span><span class='line'>
+</span><span class='line'>        classContext = classContext.getSuperclass();
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Цикл while обходит все родительские классы класса-теста, чтобы проинициализировать и их аннотации. Затем вызываются последовательно методы <code>DefaultAnnotationEngine#process</code> и <code>SpyAnnotationEngine#process</code>. В них передается ссылка на класс объекта теста и на объект теста. Реализации этих методов достаточно тривиальны и сводятся к обходу полей класса, полученных с помощью метода <code>clazz.getDeclaredFields()</code> и затем для каждого поля обходится список аннотаций, полученных методом <code>field.getAnnotations()</code>. <code>DefaultAnnotationEngine#process</code> позволяет добавлять обработчики аннотаций. </p>
+
+
+
+
+<p>Обработчик аннотаций реализует интерфейс <code>FieldAnnotationProcessor&lt;A&gt;</code>, где под типом параметра A подставляется тип аннотации, например <code>Mock</code>. Список поддерживаемых процессоров аннотаций хранится в Map&#8217;е по типу аннотации и заполняется в конструкторе <code>DefaultAnnotationEngine</code>. <code>FieldAnnotationProcessor#process</code> вызывает создание соответствующего объекта, как это делается пользователями библиотеки без использования аннотаций, т.е. с помощью вызова статических методов класса <code>Mockito</code> или <code>ArgumentCaptor</code>. <code>SpyAnnotationEngine#process</code> реализует логику процессорa аннотаций внутри себя, т.к. создан для обработки только одной аннотации - <code>@Spy</code>. Непонятно почему разработчики вынесли обработку этой аннотации в отдельный AnnotationEngine, а не добавили ещё один <code>FieldAnnotationProcessor</code>.</p>
+
+
+
+
+<p>Процесс внедрения mock-объектов в аннотированное <code>@InjectMocks</code> поле немного сложнее. Его мы рассмотрим отдельно.</p>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Mockito: Использование аннотаций]]></title>
+    <link href="http://knowlix.github.io/blog/2012/06/25/mockito-annotations/"/>
+    <updated>2012-06-25T15:03:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/06/25/mockito-annotations</id>
+    <content type="html"><![CDATA[<p><a href="https://code.google.com/p/mockito/" rel="nofollow">Mockito</a> поддерживает аннотации с 0.9&#8217;ой версии. В той версии была введена аннотация <code>@Mock</code>, которая позволяет создавать mock-объекты. Далее были добавлены и другие аннотации:</p>
+
+
+
+
+<ul class="enum">
+    <li><code>@Spy</code> создает spy-объекты</li>
+    <li><code>@Captor</code> создает экземпляр ArgumentCapture</li>
+    <li><code>@InjectMocks</code> внедряет mock- и spy- объекты в аннотированный объект</li>
+    <li><code>@Incubating</code> определяет недавно добавленный класс, с возможностью его изменения.</li>
+</ul>
+
+
+
+
+<!--more-->
+
+
+<p>Обработка аннотаций начинается с класса <code>org.mockito.MockitoAnnotaions</code>. В период существования только одной анотации <code>@Mock</code>, она была объявлена внутри этого класса, о чем свидетельствует deprecated аннотация. Позднее аннотации были вынесены в отдельные файлы.</p>
+
+<p>Запуск обработки аннотаций осуществляется вызовом метода <code>MockitoAnnotaions#initMocks</code>. Разработчики предоставили нам два пути по работе с этим классом:</p>
+
+<ol class="enum">
+    <li>Вручную, передав в качестве параметра ссылку на объект теста: <code>MockitoAnnotations.initMocks(this)</code></li>
+    <li>С помощью junit runner&#8217;a: <code>@RunWith(MockitoJUnitRunner.class)</code></li>
+</ol>
+
+
+<p>Работа Runner&#8217;a организована следующим образом. Наружу из библиотеки выглядывает объект, реализующий интерфейс <code>org.junit.runner.Runner</code> для использования непосредственно в <em>JUnit</em>. В его конструкторе с помощью <code>org.mockito.internal.runners.RunnerFactory</code> создается экземпляр внутренней реализации Runner&#8217;a.</p>
+
+<blockquote>
+    RunnerFactory инкапсулирует логику создания новых экземпляров Runner&#8217;ов в отдельный объект org.mockito.internal.runners.util.RunnerProvider. Такое решение основано на  странном способе создания Runner&#8217;ов с помощью рефлексии. Об этом ниже.
+</blockquote>
+
+
+<p> Внутренняя реализация Runner&#8217;a (назовем его Mockito Runner) определяется версией <em>JUnit</em>, т.к. начиная с версии 4.5 основной реализацией JUnit Runner&#8217;a является класс <code>org.junit.runners.BlockJUnit4ClassRunner</code>. Соответственно, версия JUnit определяется наличием класса в classpath&#8217;е проекта:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>try {
+</span><span class='line'>    Class.forName("org.junit.runners.BlockJUnit4ClassRunner");
+</span><span class='line'>    hasJUnit45OrHigher = true;
+</span><span class='line'>} catch (Throwable t) {
+</span><span class='line'>    hasJUnit45OrHigher = false;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>А создаются эти реализации с помощью рефлексии по имени класса.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (runnerProvider.isJUnit45OrHigherAvailable()) {
+</span><span class='line'>    return runnerProvider.newInstance("org.mockito.internal.runners.JUnit45AndHigherRunnerImpl", klass);
+</span><span class='line'>} else {
+</span><span class='line'>    return runnerProvider.newInstance("org.mockito.internal.runners.JUnit44RunnerImpl", klass);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Необходимость такого решения на данный момент выясняется у разработчиков <em>Mockito</em>.</p>
+
+<p>Реализации Mockito Runner в пакете <code>org.mockito.internal.runners</code>:</p>
+
+<ol class="enum">
+    <li><code>JUnit44RunnerImpl</code> использует <code>org.junit.internal.runners.JUnit4ClassRunner</code></li>
+    <li><code>JUnit45AndHigherRunnerImpl</code> использует <code>org.junit.runners.BlockJUnit4ClassRunner</code></li>
+</ol>
+
+
+<p>Mockito Runner в конструкторе создает анонимный класс, унаследованный от соответствующего JUnit Runner&#8217;a, где вызывается <code>MockitoAnnotations#initMocks</code>.</p>
+
+<blockquote>
+    При использовании runner&#8217;ов для инициализации аннотаций Mockito автоматически добавляет свой org.junit.runner.notification.RunListener - FrameworkUsageValidator. Этот валидатор подписывается на событие testFinished и вызывает org.mockito.Mockito#validateMockitoUsage для самодиагностики.
+</blockquote>
+
+
+<p>В комплекте с MockitoJUnitRunner идет еще одна реализация Runner&#8217;a - ConsoleSpammingMockitoJUnitRunner. От первого она отличается тем, что добавляет свой RunListener, который по событию testFailure логирует все сообщения. На данный момент логируются события создания mock-объектов. За коллекционирование сообщений системы отвечает класс <code>org.mockito.internal.debugging.WarningsCollector</code>, который по глобальному событию создания mock&#8217;ов логирует что и как создалось.</p>
+
+<p>Система событий в Mockito реализована своеобразно. Принцип работы отчасти позаимствован у JUnit, т.е. есть класс с методами событий. Переопределяя некоторые из них мы описываем обработчик соответствующего события. Но разработчики mockito пошли немного другим путем. Для каждого события создается отдельный интерфейс listener&#8217;a, который расширяет общий для всех listener&#8217;ов интерфейс <code>MockingProgressListener</code>. Самое интересное это то, что <code>MockingProgressListener</code> - это пустой интерфейс-маркер, а в интерфейс конкретного обработчика добавляются методы совершенно произвольной сигнатуры. На практике это выглядит следующим образом. Есть интерфейс обработчика события создания mock-объектов:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public interface MockingStartedListener extends MockingProgressListener {
+</span><span class='line'>    void mockingStarted(Object mock, Class classToMock);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>И есть непосредственно обработчик <code>org.mockito.internal.listeners.CollectCreatedMocks</code>, реализующий этот интерфейс.</p>
+
+<p>В Mockito есть центральный класс, который реализует интерфейс MockingProgress. Этот класс хранит состояние процесса тестирования с помощью <em>Mockito</em>. В момент установки состояния старта создания mock-объекта он оповещает обработчик соответствующего события следующим образом:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>if (listener != null && listener instanceof MockingStartedListener) {
+</span><span class='line'>    ((MockingStartedListener) listener).mockingStarted(mock, classToMock);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>А если ещё принять во внимание, что объект <code>MockingProgress</code> в большинстве случаев будет синглтоном, он принимает только один обработчик и метод setListener вынесен в его интерфейс, то становится страшно (надеюсь разработчики Mockito прокомментируют этот момент).</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Mockito: Структура проекта]]></title>
+    <link href="http://knowlix.github.io/blog/2012/06/23/mockito-structure/"/>
+    <updated>2012-06-23T22:24:00+04:00</updated>
+    <id>http://knowlix.github.io/blog/2012/06/23/mockito-structure</id>
+    <content type="html"><![CDATA[<p><a href="https://code.google.com/p/mockito/" rel="nofollow">Mockito</a> - библиотека для динамического создания mock-объектов и манипуляции ими. Разработка начата в 2007&#8217;ом году польским разработчиком Стивеном Фабером (Szczepan Faber). Первый релиз выпущен в 2008&#8217;ом. Последний в начале июня 2012&#8217;го. Официальный сайт находится на <em>Google Code</em>’e. Issue Tracker и Wiki там же, но в репозитории сохранились текстовые файлы с заметками и планами на будущее.</p>
+
+
+
+
+<!--more-->
+
+
+
+
+<p><em>VCS</em> - <em>Mercurial</em>.</p>
+
+
+
+
+<p>В качестве CI используется <em>Jenkins</em>.</p>
+
+
+
+
+<p>Основной build tool - <em>Ant</em>. Осуществляется переход на <em>Gradle</em>. Это логично, т.к. основной разработчик <em>Mockito</em> работает главным инженером в Gradleware. Из комментариев gradle-скрипта:</p>
+
+
+
+
+<blockquote># В определенный момент мы полностью перейдем на Gradle. Сейчас же Mockito находится в состоянии миграции на новый build tool и тем самым показывает как Ant и Gradle могут сосуществовать (для сборки из Gradle-скрипта вызывается соответствующий target Ant-скрипта).</blockquote>
+
+
+
+
+<p>В составе проекта идет утилита <em>gradle-wrapper (gradlew)</em>, которая позволяет собирать проект без предустановленного <em>Gradle</em>.</p>
+
+
+
+
+<p>Для распространения через <em>Maven</em> репозиторий на версионный контроль добавлены заготовки pom скриптов, но использовать <em>Maven</em> в качестве инструмента для сборки проекта разработчики скорее всего не будут(о чем свидетельствуют комментарии разработчиков).</p>
+
+
+
+
+<p>На версионный контроль поставлены файлы проектов <em>Eclipse</em> и <em>Intelij IDEA</em>, что очень хорошо для слабо задокументированного в области разработки Open Source проекта. В проекте используется Checkstyle, его конфигурация также есть на версионном контроле.</p>
+
+
+
+
+<p>В скрипте сборке используются Ant-расширения:</p>
+
+
+<ul class="enum">
+    <li><a href="http://pmd.sourceforge.net/pmd-5.0.0/" title="PMD scans Java source code and looks for potential problems">PMD</a> - это аналог Findbug’a, выполненный в виде библиотеки. Используется для анализа кода на наличие потенциальных проблем.</li>
+    
+    <li><a href="http://code.google.com/p/jarjar/" title="Jar Jar Links is a utility that makes it easy to repackage Java libraries and embed them into your own distribution.">JarJar</a> - продвинутый аналог стандартной таски Jar. Основное отличие - перепаковка внешних jar’ок. Используется для сборки jar’ок mockito.</li>
+    
+    <li><a href="http://ant4hg.free.fr/" title="ANT4HG is an ANT task for HG (mercurial)">Ant4HG</a> - набор Task для работы с mercurial. Используется для деплоя изменений на версионный контроль и CI.</li>
+    
+    <li><a href="http://maven.apache.org/ant-tasks/index.html" title="The Mavent Ant Tasks allow several of Maven's artifact handling features to be used from within an Ant build">Maven Ant Tasks</a> - набор Task для выполнения pom-скриптов и работы с Maven репозиториями. Используется для деплоя релизов проекта в локальный и удаленный репозитории.</li>
+</ul>
+
+
+
+
+<p>Исходный код обильно покрыт тестами. Есть пакет с примером использования <em>Mockito</em>: <code>org.mockitousage.examples.use</code>. Это неплохая точка отсчета в изучении архитектуры проекта. К тому же во многих примерах JavaDoc документации <em>Mockito</em> используются объекты из этого пакета.</p>
+
+
+
+
+<p>Непосредственно исходный код проекта разделен на две части. Внешнее API проекта (пакет <code>org.mockito</code>) и внутренняя реализация (пакет <code>org.mockito.internal</code>). Достаточно странный подход в разработке, т.к. разделение, в основном, условное и ничто не мешает им пренебречь ни разработчику <em>Mockito</em>, ни пользователю этой библиотеки.</p>
+
+
+
+
+<p>На данном этапе стоит отметить продвинутый build-скрипт, хорошее покрытие unit-тестами и немного захламленную структуру проекта.</p>
+
+]]></content>
+  </entry>
+  
+</feed>

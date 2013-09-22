@@ -1,0 +1,355 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Netty: Структура проекта -  CodeInsider</title>
+  <meta name="author" content="Code insiders">
+
+  
+  <meta name="description" content=" Обзоры архитектурных решений Open Source проектов ">
+  <meta name="keywords" content=" code review, open source, обзор проектов, JVM ">
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <meta http-equiv="cache-control" content="max-age=0" />
+  <meta http-equiv="cache-control" content="no-cache" />
+  <meta http-equiv="expires" content="0" />
+  <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
+  <meta http-equiv="pragma" content="no-cache" />
+
+  
+  <link rel="canonical" href="http://knowlix.github.io/blog/2012/07/22/netty-common-knowladge/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <script src="/javascripts/audiojs/audio.min.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="CodeInsider" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-17465176-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<h3 class="main-logo"><a href="/">CodeInsider</a></h3>
+
+<ul class="main-navigation">
+  <li><a href="/">Code reviews</a></li>
+  <li><a href="/blog/archives">Archive</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Netty: Структура проекта</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-22T10:36:00+04:00" pubdate data-updated="true">10:36 22.07.2012</time>
+        
+         | <a href="#disqus_thread">Комментарии</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p><a href="http://netty.io">Netty</a> - framework для написания приложений, взаимодействующих по сети. Это может быть и балансировщик нагрузки, и сетевой паук, и практически любая другая архитектура, основанная на понятии client/server.</p>
+
+<!--more-->
+
+
+<p>В основе лежит <code>java.io</code> и <code>java.nio</code>. Выбор базового механизма осуществляется путем использования конкретных реализаций ключевых компонентов. Подход к их использованию скрыт под абстракцией и интерфейсами, так что перейти от одного к другому не составит труда в отличие от того, как бы это было реализовано в <em>Java</em>.</p>
+
+<p>Все сетевые операции асинхронны. Управление асинхронным взаимодействием осуществляется на основе событийной модели или с использованием <em>Future</em> объектов подобных <em>Future</em> объектам в <em>Java</em>.</p>
+
+<p>Workflow типичной программы на Netty:</p>
+
+<ol>
+<li>Создается новый экземпляр <code>ChannelFactory</code> - фабрика, порождающая каналы - базовые сущности библиотеки. Именно они скрывают за собой особенность реализации процесса сетевого взаимодействия. По большому счету, канал - это абстракция над соединением, куда можно писать и откуда можно читать информацию. Очевдно, что реализация <code>ChannelFactory</code> также отражает используемые технологии. Например, для использования java.nio используется <code>NioServerSocketChannelFactory</code>.</li>
+<li>Создается новый экземпляр <code>Bootstrap</code> объекта - вспомогательный класс, который упрощает процесс конфигурирования приложения. Обязательным параметром Bootstrap объекта является <code>ChannelFactory</code>, с помощью которого приложение будет открывать новые сетевые соединения.</li>
+<li>Задается фабрика <code>ChannelPipelineFactory</code>, которая является ключевым элементом в событийной модели <em>Netty</em>. Обработчики событий <code>ChannelHandler</code> организованы подобно обработчикам <em>JUnit</em> или <em>Mockito</em> (возможно, не совсем равноценное сравнение), т.е. каждому методу обработчика соответствует событие. Переопределяя эти методы, мы подписываемся на связанные с ними события. <em>Netty</em> оперирует цепочкой обработчиков <code>ChannelPipeline</code>, т.е. отреагировав на событие, один обработчик передает управление другому обработчику в цепочке. Реализуя фабрику pipeline&#8217;ов, мы можем определить свои обработчики в цепочке.</li>
+<li>Второстепенная конфигурация приложения через <code>Bootstrap</code>.</li>
+<li>Запуск сетевого приложения.</li>
+<li>Завершение сетевого приложения.</li>
+</ol>
+
+
+<p><em>Netty</em> потрясающе документирован. Его документация по-настоящему самодостаточна и понятна. Крайне рекомендую изучить примеры использования этой библиотеки в <a href="http://static.netty.io/3.5/guide/">официальной документации проекта</a>. Кстати о версиях. На данный момент, финальная версия - <code>3.5.2</code>. Последний релиз был 5го июля 2012 года. Но вместе с тем идет разработка 4ой версии <em>Netty</em>. К сожалению, эта версия находится в Alpha стадии и не имеет какого либо руководства пользователя. При этом, структура классов немного поменялась, поэтому просто так использовать новую версию не получится.</p>
+
+<p>Исходные коды хостятся на <a href="https://github.com/netty/netty">Github</a>. В качестве build tool используется <em>Maven</em>. Проект организован в виде нескольких модулей. Т.е. внутри корневого пакета <code>io.netty</code> пакеты разделены на модули. Каждый модуль находится в отдельном каталоге, который реализован также ввиде maven проекта. Внутри центрального pom файла объявляются все дочерние модули:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;modules>
+</span><span class='line'>  &lt;module>common&lt;/module> - утилитарные классы + логирование
+</span><span class='line'>  &lt;module>buffer&lt;/module> - базовая структура данных и все, что требуется для ее работы
+</span><span class='line'>  &lt;module>codec&lt;/module> - реализации обработчиков, преобразующие данные в цепочке обработки
+</span><span class='line'>  &lt;module>codec-http&lt;/module> - реализация обработчиков и утилитарных методов, специфичных для взаимодействия поверх HTTP
+</span><span class='line'>  &lt;module>transport&lt;/module> - ядро *Netty*, управляющее передачей данных и соединением (Bootstrap, Channel, ChannelHandler)
+</span><span class='line'>  &lt;module>handler&lt;/module> - утилитарные классы, необходимые для работы обработчиков
+</span><span class='line'>  &lt;module>example&lt;/module> - примеры программ, использующих *Netty*
+</span><span class='line'>  &lt;module>testsuite&lt;/module> - тесты на *JUnit*. Тестов немного, но они есть.
+</span><span class='line'>  &lt;module>all&lt;/module> - сборка всех модулей в один jar'файл
+</span><span class='line'>  &lt;module>tarball&lt;/module> - сборка в tarball архив
+</span><span class='line'>&lt;/modules></span></code></pre></td></tr></table></div></figure>
+
+
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Code insiders</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-22T10:36:00+04:00" pubdate data-updated="true">10:36 22.07.2012</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/netty/'>Netty</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://knowlix.github.io/blog/2012/07/22/netty-common-knowladge/" data-via="queuepy" data-counturl="http://knowlix.github.io/blog/2012/07/22/netty-common-knowladge/" >Tweet</a>
+  
+  
+  <div class="g-plusone" data-size="medium"></div>
+  
+  
+    <div class="fb-like" data-send="true" data-width="450" data-show-faces="false"></div>
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2012/07/20/podcast-2/" title="Previous Post: Подкаст: Второй выпуск">&laquo; Подкаст: Второй выпуск</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2012/08/04/netty-start-server/" title="Next Post: Netty: Запуск socket сервера">Netty: Запуск socket сервера &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2013/03/03/scribe-oauth-library/">Прицельный обзор: OAuth вне браузера через Scribe</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/09/09/netty-start-server-4/">Netty 4.0: Запуск сервера</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/08/24/metrics-reporting/">Прицельный обзор: Reporter'ы в библиотеке Metrics</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/08/15/netty-message-management/">Netty: Управление сообщениями</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/08/10/podcast-3/">Подкаст: Третий выпуск</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("queuepy", 4, false);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/queuepy" class="twitter-follow-button" data-show-count="false">Follow @queuepy</a>
+  
+</section>
+
+
+
+<section class="googleplus">
+  <h1>
+    <a href="https://plus.google.com/106854167863011611466?rel=author">
+      <img src="http://www.google.com/images/icons/ui/gprofile_button-32.png" width="32" height="32">
+      Google+
+    </a>
+  </h1>
+</section>
+
+
+<section>
+  <h1>Поддержать проект</h1>
+  
+  <p style="margin: 10px -10px;"><iframe frameborder="0" allowtransparency="true" scrolling="no" src="https://money.yandex.ru/embed/small.xml?uid=41001821062196&amp;button-text=01&amp;button-size=m&amp;button-color=white&amp;targets=%d0%9f%d0%be%d0%b4%d0%b4%d0%b5%d1%80%d0%b6%d0%ba%d0%b0+%d0%bf%d1%80%d0%be%d0%b5%d0%ba%d1%82%d0%b0+queuepy.com&amp;default-sum=100&amp;mail=on" width="200px" height="42"></iframe></p>
+</section>
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p style="float: left; margin-bottom: 0;">
+  Copyright &copy; 2013 - CodeInsider
+</p>
+<p style="float: right"><a href="mailto:knowlix@outlook.com">Написать письмо автору проекта</a></p>
+
+</footer>
+  <script type="text/javascript">
+  audiojs.events.ready(function() {
+    var as = audiojs.createAll();
+  });
+</script>
+
+
+<script type="text/javascript">
+      var disqus_shortname = 'queuepy';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://knowlix.github.io/blog/2012/07/22/netty-common-knowladge/';
+        var disqus_url = 'http://knowlix.github.io/blog/2012/07/22/netty-common-knowladge/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+<div id="fb-root"></div>
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) {return;}
+  js = d.createElement(s); js.id = id;
+  js.src = "//connect.facebook.net/en_US/all.js#appId=212934732101925&xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+
+
+
+  <script type="text/javascript">
+    (function() {
+      var script = document.createElement('script'); script.type = 'text/javascript'; script.async = true;
+      script.src = 'https://apis.google.com/js/plusone.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(script, s);
+    })();
+  </script>
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>
