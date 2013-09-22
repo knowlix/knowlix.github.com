@@ -1,10 +1,9 @@
-﻿
 ---
 layout: post
 title: "Прицельный обзор: Зачем Spring'у proxy объекты"
 date: 2012-07-17 00:01
-published: true
 comments: true
+published: true
 categories: [Spring Framework, Sighting review]
 ---
 Как уже стало известно, в основе процесса создания [Spring](http://www.springsource.org/spring-framework) бинов лежит *CGLib* - очень распространенная библиотека для создания классов в режиме реального времени. Ее используют такие библиотеки как *Hibernate*, *iBATIS* и [многие другие](http://cglib.sourceforge.net).
