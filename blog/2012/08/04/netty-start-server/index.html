@@ -1,0 +1,593 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Netty: Запуск socket сервера -  Queuepy</title>
+  <meta name="author" content="Evgenij Kozhevnikov">
+
+  
+  <meta name="description" content=" Обзоры архитектурных решений Open Source проектов ">
+  <meta name="keywords" content=" code review, open source, обзор проектов, JVM ">
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <meta http-equiv="cache-control" content="max-age=0" />
+  <meta http-equiv="cache-control" content="no-cache" />
+  <meta http-equiv="expires" content="0" />
+  <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
+  <meta http-equiv="pragma" content="no-cache" />
+
+  
+  <link rel="canonical" href="http://queuepy.com/blog/2012/08/04/netty-start-server/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <script src="/javascripts/audiojs/audio.min.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="Queuepy" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-17465176-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<h3 class="main-logo"><a href="/">Queuepy</a></h3>
+
+<ul class="main-navigation">
+  <li><a href="/">Code reviews</a></li>
+  <li><a href="/blog/archives">Archive</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Netty: Запуск Socket сервера</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-08-04T12:39:00+04:00" pubdate data-updated="true">12:39 04.08.2012</time>
+        
+         | <a href="#disqus_thread">Комментарии</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Как было отмечено ранее, стабильная ветка <a href="http://netty.io/">Netty</a> обладает отличным <a href="http://static.netty.io/3.5/api/">JavaDoc</a>, а более новая четвертая ветка практически не задокументирована. Хочется еще отметить, что в <em>JavaDoc&#8217;е</em> <em>Netty</em> используется специальный <em>JavaDoc</em> доклет <a href="http://code.google.com/p/apiviz/">ApiViz</a>, который позволяет отображать связи компонент прямо в документации ввиде графиков. В связи с этим обзор архитектуры будет вестись по 3ей версии. Именно по ней будет изучена терминология проекта, а уже с какими-то знаниями о компонентах системы мы посмотрим на отличия в реализации той или иной фичи в новой четвертой версии <em>Netty</em>.</p>
+
+<!--more-->
+
+
+<p>В качестве отправной точки, будем использовать учебный проект Echo сервера, идущий вместе с исходниками <em>Netty</em>.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ServerBootstrap bootstrap = new ServerBootstrap(
+</span><span class='line'>  new NioServerSocketChannelFactory(
+</span><span class='line'>          Executors.newCachedThreadPool(),
+</span><span class='line'>          Executors.newCachedThreadPool()));
+</span><span class='line'>
+</span><span class='line'>bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
+</span><span class='line'>  public ChannelPipeline getPipeline() throws Exception {
+</span><span class='line'>      return Channels.pipeline(new EchoServerHandler());
+</span><span class='line'>  }
+</span><span class='line'>});
+</span><span class='line'>
+</span><span class='line'>bootstrap.bind(new InetSocketAddress(port));</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Запуск сервера начинается с создания объекта helper класса <code>ServerBootstrap</code>. Этот объект позволяет сконфигурировать сервер, наполнить его ключевыми компонентами  и наконец, запустить. В первую очередь необходимо указать фабрику каналов. Каналы представляют собой сетевое соединение и <em>Netty</em> поддерживает несколько их реализаций. Основные из них это соединения использующие:</p>
+
+<ol>
+<li>Old I/O Java package</li>
+<li>New I/O Java package</li>
+</ol>
+
+
+<p>Если первый тип реализации - это скорее пережиток прошлого и нужен лишь для поддержки старых программ, то второй тип - это то, что нам нужно. <code>ChannelFactory</code> можно не задавать в конструкторе <code>ServerBootstrap</code>, а использовать <code>ServerBootstrap#setChannelFactory</code> метод. Setter-метод можно использовать только один раз. Это лишь логическое ограничение, которое проверяется естественно только в runtime&#8217;e.</p>
+
+<p><code>NioServerSocketChannelFactory</code> оперирует двумя пулами потоков для создание асинхронных соединений. Пулы можно задать в конструкторе <code>ChannelFactory</code>. В противном случае создаются стандартные кеширующие java пулы:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Executors.newCachedThreadPool()</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Зачем фабрике каналов два пула потоков? Первый из них - boss pool. Создает новые потоки для входящих соединений. Второй же worker pool, обеспечивает потоки для неблокирующих операций записи/чтения.</p>
+
+<p>При создании соединения для канала создается свой pipeline - цепочка обработчиков асинхронных событий каналов. Поэтому <code>ServerBootstrap</code> должен обладать фабрикой pileline&#8217;ов. Создавая фабрику pipeline&#8217;ов определяются обработчики. В данном случае это один обработчик <code>EchoServerHandler</code>. Удивительно, что без фабрик каналов и pipeline&#8217;ов сервер работать не будет, но в архитектуре возможность создания сервера без фабрик есть, т.к. задаются они setter методами.</p>
+
+<p><code>ServerBootstrap#bind</code> запускает сервер, а точнее вешает сервер на определенный адрес. Рассмотрим на данном примере, как запускается <em>NIO Socet Server</em>.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Channel bind(final SocketAddress localAddress) {
+</span><span class='line'>  if (localAddress == null) {
+</span><span class='line'>      throw new NullPointerException("localAddress");
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  final BlockingQueue&lt;ChannelFuture> futureQueue = new LinkedBlockingQueue&lt;ChannelFuture>();
+</span><span class='line'>
+</span><span class='line'>  ChannelHandler binder = new Binder(localAddress, futureQueue);
+</span><span class='line'>  ChannelHandler parentHandler = getParentHandler();
+</span><span class='line'>
+</span><span class='line'>  ChannelPipeline bossPipeline = pipeline();
+</span><span class='line'>  bossPipeline.addLast("binder", binder);
+</span><span class='line'>  if (parentHandler != null) {
+</span><span class='line'>      bossPipeline.addLast("userHandler", parentHandler);
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  Channel channel = getFactory().newChannel(bossPipeline);
+</span><span class='line'>
+</span><span class='line'>  // Wait until the future is available.
+</span><span class='line'>  ChannelFuture future = null;
+</span><span class='line'>  boolean interrupted = false;
+</span><span class='line'>  do {
+</span><span class='line'>      try {
+</span><span class='line'>          future = futureQueue.poll(Integer.MAX_VALUE, TimeUnit.SECONDS);
+</span><span class='line'>      } catch (InterruptedException e) {
+</span><span class='line'>          interrupted = true;
+</span><span class='line'>      }
+</span><span class='line'>  } while (future == null);
+</span><span class='line'>
+</span><span class='line'>  if (interrupted) {
+</span><span class='line'>      Thread.currentThread().interrupt();
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  future.awaitUninterruptibly();
+</span><span class='line'>  if (!future.isSuccess()) {
+</span><span class='line'>      future.getChannel().close().awaitUninterruptibly();
+</span><span class='line'>      throw new ChannelException("Failed to bind to: " + localAddress, future.getCause());
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  return channel;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Запуск сервера начинается с открытия нового канала, который создается с помощью фабрики каналов, которую мы засетили. В нашем случае будет создан <code>NioServerSocketChannel</code>. В конструкторе этого канала будет создан Java <code>SocetChannel</code>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>socket = ServerSocketChannel.open()</span></code></pre></td></tr></table></div></figure>
+
+
+<p>И если socket открыт удачно, то канал сигнализирует событие об открытии нового канала.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static void fireChannelOpen(Channel channel) {
+</span><span class='line'>  if (channel.getParent() != null) {
+</span><span class='line'>      fireChildChannelStateChanged(channel.getParent(), channel);
+</span><span class='line'>  }
+</span><span class='line'>
+</span><span class='line'>  channel.getPipeline().sendUpstream(
+</span><span class='line'>          new UpstreamChannelStateEvent(
+</span><span class='line'>                  channel, ChannelState.OPEN, Boolean.TRUE));
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Стоит рассказать, что в событийной модели <em>Netty</em> присутствуют два вида сообщений:</p>
+
+<ol>
+<li><em>Upstream</em> - входящие</li>
+<li><em>Downstream</em> - исходящие</li>
+</ol>
+
+
+<p>Все сообщения циркулируют по pipeline. Можно рассматривать pipeline, как цепочку обработчиков событий. Любой обработчик может остановить на себе обработку сообщения. Посыл сообщений происходит соответственно через pipeline.</p>
+
+<p>Канал может быть создан другим каналом. Тот будет для нового канала родительским. Для каналов клиентской стороны родительским каналом будет канал серверной стороны. Входящее сообщение об открытии канала посылается и родительскому каналу, если он есть (метод <code>fireChildChannelStateChanged</code>), и обработчикам данного канала.</p>
+
+<p>Boss-канал, открывающий соединение, на данном этапе кроме открытия сокета и порождения события об этом, ничего не делает и не может делать, так как не обладает нужной для этого информацией. Как же происходит слежение за сообщениями данного канала? Очевидно, что у данного канала должны быть свои обработчики, которые будут ожидать события открытия соединения и в этот момент выполнять всю необходимую для нас работу.</p>
+
+<p>При создании в <code>ServerBootstrap</code> нового сокет канала инициализирует boss pipeline, куда добавляется обязательный обработчик <code>Binder</code> и пользовательский обработчик, который можно задать через метод <code>ServerBootstrap#setParentHandler</code>. Класс обязательного обработчика является внтуренним для класса <code>ServerBootstrap</code>, т.к. является неотъемлемой его частью. В момент получения события об открытии нового socket-канала, <code>Binder</code> получает ссылку на Netty канал из объекта события и задает ему пользовательский <code>PipelineFactory</code>, пользовательские настройки и привязывает открытое соединение к конкретному адресу. По аналогии с Java сокетами, Netty сокеты также обладают методом bind, который привязывает его к конкретному адресу.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static ChannelFuture bind(Channel channel, SocketAddress localAddress) {
+</span><span class='line'>  if (localAddress == null) {
+</span><span class='line'>      throw new NullPointerException("localAddress");
+</span><span class='line'>  }
+</span><span class='line'>  ChannelFuture future = future(channel);
+</span><span class='line'>  channel.getPipeline().sendDownstream(new DownstreamChannelStateEvent(
+</span><span class='line'>          channel, future, ChannelState.BOUND, localAddress));
+</span><span class='line'>  return future;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Асинхронная модель работы <em>Netty</em> основана не тольно на событиях, но также и на Future объектах. Если события обеспечивают работу через callback&#8217;и и в данном случае поток, вызвавший операцию, никак не связан с асинхронным процессом, то Future объект предоставляет loop алгоритм, связывая асинхронный вызванный процесс с его родителем. Запуск сервера - как раз такой случай, т.к. этот метод должен вернуть открытый и сконфигурированный канал. Но если до данного момента работа шла в синхронном режиме, то привязка адреса к открытому соединению полноценно открывает сервер для клиентских соединений, запуская соответствующие потоки. Поэтому данный метод возвращает <code>ChannelFuture</code> объект с сылкой на текущий канал и вызывает исходящее событие привязки сервера к адресу.</p>
+
+<p>В методах pipeline&#8217;а отправки сообщения происходит некоторое проксирование сообщений, т.к. разные реализации каналов могут работать по разному с разными сообщениями. Очевидно, что проксирование сообщений специфично для разных видов реализаций каналов, поэтому фабрика каналов, помимо типа самих каналов определяет конкретную реализацию проксирующего класса. Проксирующий класс определяет какие сообщения поддерживает канал и возможно даже обрабатывает какие-то из них, которые служат только для внутреннего использования. Такие объекты в <em>Netty</em> именуются <em>Sink</em> объектами. В данном случае обработка события привязки сервера к адресу обрабатывается внутри <code>NioServerSocketPipelineSink</code>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void bind(
+</span><span class='line'>      NioServerSocketChannel channel, ChannelFuture future,
+</span><span class='line'>      SocketAddress localAddress) {
+</span><span class='line'>
+</span><span class='line'>  boolean bound = false;
+</span><span class='line'>  boolean bossStarted = false;
+</span><span class='line'>  try {
+</span><span class='line'>      channel.socket.socket().bind(localAddress, channel.getConfig().getBacklog());
+</span><span class='line'>      bound = true;
+</span><span class='line'>
+</span><span class='line'>      future.setSuccess();
+</span><span class='line'>      fireChannelBound(channel, channel.getLocalAddress());
+</span><span class='line'>
+</span><span class='line'>      Executor bossExecutor =
+</span><span class='line'>          ((NioServerSocketChannelFactory) channel.getFactory()).bossExecutor;
+</span><span class='line'>      DeadLockProofWorker.start(bossExecutor,
+</span><span class='line'>              new ThreadRenamingRunnable(new Boss(channel),
+</span><span class='line'>                      "New I/O server boss #" + id + " (" + channel + ')'));
+</span><span class='line'>      bossStarted = true;
+</span><span class='line'>  } catch (Throwable t) {
+</span><span class='line'>      future.setFailure(t);
+</span><span class='line'>      fireExceptionCaught(channel, t);
+</span><span class='line'>  } finally {
+</span><span class='line'>      if (!bossStarted && bound) {
+</span><span class='line'>          close(channel, future);
+</span><span class='line'>      }
+</span><span class='line'>  }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>В первую очередь вызывается привязка адреса к <em>Java</em> сокету. Далее <code>ChannelFuture</code> переводится в состояние успешного выполнения операции и посылается уже входящее сообщение pipeline&#8217;у канала о привязке сервера к адресу. Далее получается пул потоков, который мы передали фабрике каналов и с помощью него запускается boss-поток, который будет следить за соединениями по данному каналу. Теперь наш сервер может принимать соединения и обрабатывать их нашим pipeline&#8217;ом.</p>
+
+<p>Т.е. на данном этапе <em>Binder</em> обработчик связал сокет с адресом и осталось оповестить <code>ServerBootstrap</code> о статусе конфигурирования канала и вернуть наружу ссылку на сам канал. Но тут есть две проблемы:</p>
+
+<ol>
+<li>Событийная модель <em>Netty</em> работает в асинхронном режиме, что не дает вернуть напрямую результат работы обработчика</li>
+<li>Так как режим асинхронный, то <code>ServerBootstrap</code> работает в своем пространстве и, если не предпринято каких-то шаманских действий, то вполне возможно уже отработал.</li>
+</ol>
+
+
+<p>А шаманские действия, как вы уже возможно успели заметить, предприняты. В <code>ServerBootstrap</code> до инициализации <em>Binder</em> обработчика создается <code>BlockingQueue</code>, которая передается в <em>Binder</em>. Далее, проинициализировав boss обработчик и создав канал, <code>ServerBootstrap</code> пытается прочитать из очереди <code>ChannelFuture</code>, но так как очередь блокирующая и в ней нет на данный момент сообщений, то поток <code>ServerBootstrap</code> подвешивается пока очередь не будет готова вернуть сообщение.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>future = futureQueue.poll(Integer.MAX_VALUE, TimeUnit.SECONDS);</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Как только <em>Binder</em> сконфигурировал открытый канал, он помещает <code>ChannelFuture</code> объект, который мы ранее рассмотрели в методе <code>bind</code> самого канала, в эту очередь:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>boolean finished = futureQueue.offer(evt.getChannel().bind(localAddress));</span></code></pre></td></tr></table></div></figure>
+
+
+<p>В этот момент поток выполнения <code>ServerBootstrap</code> оживает и получает это сообщение из очереди и если статус <code>ChannelFuture</code> говорит, что все прошло хорошо, то наружу возвращает ссылка на открытый канал.</p>
+
+<p>Вот так просто и изящно создаются socket соединения в <em>Netty 3.5</em>.</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Evgenij Kozhevnikov</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-08-04T12:39:00+04:00" pubdate data-updated="true">12:39 04.08.2012</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/netty/'>Netty</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://queuepy.com/blog/2012/08/04/netty-start-server/" data-via="queuepy" data-counturl="http://queuepy.com/blog/2012/08/04/netty-start-server/" >Tweet</a>
+  
+  
+  <div class="g-plusone" data-size="medium"></div>
+  
+  
+    <div class="fb-like" data-send="true" data-width="450" data-show-faces="false"></div>
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2012/07/22/netty-common-knowladge/" title="Previous Post: Netty: Структура проекта">&laquo; Netty: Структура проекта</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2012/08/07/netty-connection-management/" title="Next Post: Netty: Управление соединениями">Netty: Управление соединениями &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2013/03/03/scribe-oauth-library/">Прицельный обзор: OAuth вне браузера через Scribe</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/09/09/netty-start-server-4/">Netty 4.0: Запуск сервера</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/08/24/metrics-reporting/">Прицельный обзор: Reporter'ы в библиотеке Metrics</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/08/15/netty-message-management/">Netty: Управление сообщениями</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/08/10/podcast-3/">Подкаст: Третий выпуск</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("queuepy", 4, false);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/queuepy" class="twitter-follow-button" data-show-count="false">Follow @queuepy</a>
+  
+</section>
+
+
+
+<section class="googleplus">
+  <h1>
+    <a href="https://plus.google.com/106854167863011611466?rel=author">
+      <img src="http://www.google.com/images/icons/ui/gprofile_button-32.png" width="32" height="32">
+      Google+
+    </a>
+  </h1>
+</section>
+
+
+<section>
+  <h1>Поддержать проект</h1>
+  
+  <p style="margin: 10px -10px;"><iframe frameborder="0" allowtransparency="true" scrolling="no" src="https://money.yandex.ru/embed/small.xml?uid=41001821062196&amp;button-text=01&amp;button-size=m&amp;button-color=white&amp;targets=%d0%9f%d0%be%d0%b4%d0%b4%d0%b5%d1%80%d0%b6%d0%ba%d0%b0+%d0%bf%d1%80%d0%be%d0%b5%d0%ba%d1%82%d0%b0+queuepy.com&amp;default-sum=100&amp;mail=on" width="200px" height="42"></iframe></p>
+</section>
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p style="float: left; margin-bottom: 0;">
+  Copyright &copy; 2013 - Queuepy.com
+</p>
+<p style="float: right"><a href="mailto:support@queuepy.com">Напишите мне</a></p>
+
+</footer>
+  <script type="text/javascript">
+  audiojs.events.ready(function() {
+    var as = audiojs.createAll();
+  });
+</script>
+
+
+<script type="text/javascript">
+      var disqus_shortname = 'queuepy';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://queuepy.com/blog/2012/08/04/netty-start-server/';
+        var disqus_url = 'http://queuepy.com/blog/2012/08/04/netty-start-server/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+<div id="fb-root"></div>
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) {return;}
+  js = d.createElement(s); js.id = id;
+  js.src = "//connect.facebook.net/en_US/all.js#appId=212934732101925&xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+
+
+
+  <script type="text/javascript">
+    (function() {
+      var script = document.createElement('script'); script.type = 'text/javascript'; script.async = true;
+      script.src = 'https://apis.google.com/js/plusone.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(script, s);
+    })();
+  </script>
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,933 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Netty | Queuepy]]></title>
+  <link href="http://queuepy.com/blog/categories/netty/atom.xml" rel="self"/>
+  <link href="http://queuepy.com/"/>
+  <updated>2013-03-05T23:42:02+04:00</updated>
+  <id>http://queuepy.com/</id>
+  <author>
+    <name><![CDATA[Evgenij Kozhevnikov]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Netty 4.0: Запуск сервера]]></title>
+    <link href="http://queuepy.com/blog/2012/09/09/netty-start-server-4/"/>
+    <updated>2012-09-09T21:52:00+04:00</updated>
+    <id>http://queuepy.com/blog/2012/09/09/netty-start-server-4</id>
+    <content type="html"><![CDATA[<p>Сегодня проведем тонкую грань между разными версиями <em>Netty</em> на примере запуска socket сервера. Ранее мы уже рассматривали <a href="http://queuepy.com/blog/2012/08/04/netty-start-server/">запуск сервера на базе Netty 3.5</a>. Сегодня рассмотрим, как этот процесс осуществляется в четвертой ветке <em>Netty</em>.</p>
+
+<!--more-->
+
+
+<p>В качестве отправной точки также, как и ранее будем использовать проект, идущий с исходниками ввиде примера Echo сервера. Стоит сразу сказать, что если в версии 3.5 все исходники делились логически с помощью пакетов, то в новой версии исходники разбиты на модули и все примеры использования Netty находятся в отдельном модуле <code>example</code>.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ServerBootstrap b = new ServerBootstrap();
+</span><span class='line'>try {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>b.eventLoop(new NioEventLoop(), new NioEventLoop())
+</span><span class='line'> .channel(new NioServerSocketChannel())
+</span><span class='line'> .option(ChannelOption.SO_BACKLOG, 100)
+</span><span class='line'> .localAddress(new InetSocketAddress(port))
+</span><span class='line'> .childOption(ChannelOption.TCP_NODELAY, true)
+</span><span class='line'> .handler(new LoggingHandler(LogLevel.INFO))
+</span><span class='line'> .childHandler(new ChannelInitializer&lt;SocketChannel&gt;() {
+</span><span class='line'>     @Override
+</span><span class='line'>     public void initChannel(SocketChannel ch) throws Exception {
+</span><span class='line'>         ch.pipeline().addLast(
+</span><span class='line'>                 new LoggingHandler(LogLevel.INFO),
+</span><span class='line'>                 new EchoServerHandler());
+</span><span class='line'>     }
+</span><span class='line'> });
+</span><span class='line'>
+</span><span class='line'>ChannelFuture f = b.bind().sync();
+</span><span class='line'>
+</span><span class='line'>f.channel().closeFuture().sync();
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>} finally {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>b.shutdown();
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Как и в случае с 3ей версией все начинается с <code>ServerBootstrap</code> - объекта-конфигуратора <em>Netty</em> сервера. Принцип конфигурирования теперь реализован ввиде некого Builder-объекта, где каждый метод-конфигуратор возвращает ссылку на builder до тех пор пока не вызовится метод-строитель. При этом инстанцирование объекта <code>ServerBootstrap</code> отделено от его конфигурирования, т.к. есть только конструктор по-умолчанию (без параметров). Данный подход является более чистым, чем в третьей версии. Там при создании объекта <code>ServerBootstrap</code> необходимо задать фабрику каналов, при этом задание <code>PipelineFactory</code> вынесена в конфигурационный метод. Напомню, что запуск невозможен и без фабрики каналов и без фабрики <code>pipeline'ов</code>. Таким образом есть некая неразбериха. В новом же подходе все объекты задаются на одном уровне, при этом в методе-строителе произведется проверка на корректность сконфигурированных объектов.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Netty: Управление сообщениями]]></title>
+    <link href="http://queuepy.com/blog/2012/08/15/netty-message-management/"/>
+    <updated>2012-08-15T22:37:00+04:00</updated>
+    <id>http://queuepy.com/blog/2012/08/15/netty-message-management</id>
+    <content type="html"><![CDATA[<p>После открытия сокета вызывается так называемая регистрация открытого <em>Netty</em> канала, чтобы сообщения этого соединения могли быть обработаны в рамках <em>Netty</em>. Сегодня мы посмотрим, как происходит управление сообщениями.</p>
+
+<!--more-->
+
+
+<p>Все начинается с этого метода, который вызывается после принятия открытого соединения:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void registerAcceptedChannel(SocketChannel acceptedSocket, Thread currentThread) {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>try {
+</span><span class='line'>    ChannelPipeline pipeline =
+</span><span class='line'>        channel.getConfig().getPipelineFactory().getPipeline();
+</span><span class='line'>    NioWorker worker = nextWorker();
+</span><span class='line'>    worker.register(new NioAcceptedSocketChannel(
+</span><span class='line'>            channel.getFactory(), pipeline, channel,
+</span><span class='line'>            NioServerSocketPipelineSink.this, acceptedSocket,
+</span><span class='line'>            worker, currentThread), null);
+</span><span class='line'>} catch (Exception e) {
+</span><span class='line'>    try {
+</span><span class='line'>        acceptedSocket.close();
+</span><span class='line'>    } catch (IOException e2) {
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Обработка сообщений в <em>Netty</em> производится цепочкой обработчиков, которая в терминологии <em>Netty</em> называется <code>pipeline</code>. Поэтому в первую очередь создается новый pipeline с помощью фабрики, которую мы проинициализировали в момент создания сервера. Для обработки сообщений в конкретном соединении канала создается отдельный Worker поток. За обработку операции ввода/вывода отвечают <code>Worker'ы</code>. В частности nio операции управляются <code>NioWorker'ом</code>. <code>Worker'ы</code> создаются внутри пула воркеров. Передавая в <code>NioServerSocketChannelFactory</code> пул воркер-потоков, этот пул оборачивается в <code>NioWorkerPool</code>, в конструкторе которого создаются экземпляры <code>NioWorker'ов</code>. Количество воркеров ограничено количеством процессоров, доступных JVM из расчета - на каждый процессор два воркера.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>static final int DEFAULT_IO_THREADS = Runtime.getRuntime().availableProcessors() * 2;</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Объекты воркеров хранятся в обычном массиве внутри пула. При регистрации канала, из пула воркеров последовательно достается воркер с помощью метода <code>nextWorker</code>:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public E nextWorker() {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>return (E) workers[Math.abs(workerIndex.getAndIncrement() % workers.length)];
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Индекс текущего воркера хранится в <code>AtomicInteger</code> переменной. Целочисленное деление индекса на количество воркеров в пуле гарантирует получение воркера в пределах массива воркеров.</p>
+
+<p>Далее создается новый канал <code>NioAcceptedSocketChannel</code> и регистрируется внутри воркера. За принятие соединений отвечает один канал, за получение и отправку сообщений отвечает только что созданный канал. Регистрация канала начинается с создания объекта задачи регистрации <code>RegisterTask</code>. Этот объект специфичен для конкретного воркера и объявляется внутри него. Далее запускается поток воркера:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void run() {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>thread = Thread.currentThread();
+</span><span class='line'>
+</span><span class='line'>boolean shutdown = false;
+</span><span class='line'>Selector selector = this.selector;
+</span><span class='line'>for (;;) {
+</span><span class='line'>    try {
+</span><span class='line'>        SelectorUtil.select(selector);
+</span><span class='line'>
+</span><span class='line'>        cancelledKeys = 0;
+</span><span class='line'>        processRegisterTaskQueue();
+</span><span class='line'>        processEventQueue();
+</span><span class='line'>        processWriteTaskQueue();
+</span><span class='line'>        processSelectedKeys(selector.selectedKeys());
+</span><span class='line'>
+</span><span class='line'>        if (selector.keys().isEmpty()) {
+</span><span class='line'>            if (shutdown ||
+</span><span class='line'>                executor instanceof ExecutorService &amp;&amp; ((ExecutorService) executor).isShutdown()) {
+</span><span class='line'>
+</span><span class='line'>                synchronized (startStopLock) {
+</span><span class='line'>                    if (registerTaskQueue.isEmpty() &amp;&amp; selector.keys().isEmpty()) {
+</span><span class='line'>                        started = false;
+</span><span class='line'>                        try {
+</span><span class='line'>                            selector.close();
+</span><span class='line'>                        } catch (IOException e) {
+</span><span class='line'>                        } finally {
+</span><span class='line'>                            this.selector = null;
+</span><span class='line'>                        }
+</span><span class='line'>                        break;
+</span><span class='line'>                    } else {
+</span><span class='line'>                        shutdown = false;
+</span><span class='line'>                    }
+</span><span class='line'>                }
+</span><span class='line'>            } else {
+</span><span class='line'>                if (allowShutdownOnIdle) {
+</span><span class='line'>                    shutdown = true;
+</span><span class='line'>                }
+</span><span class='line'>            }
+</span><span class='line'>        } else {
+</span><span class='line'>            shutdown = false;
+</span><span class='line'>        }
+</span><span class='line'>    } catch (Throwable t) {
+</span><span class='line'>        try {
+</span><span class='line'>            Thread.sleep(1000);
+</span><span class='line'>        } catch (InterruptedException e) {
+</span><span class='line'>            // Ignore.
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Стоит отметить, что запуск потока вызывается в блоке синхронизации с объектом блокировки, который принадлежит конкретному объекту worker'а. Эта блокировка гарантирует последовательную обработку сообщений с помощью одного и того же воркера, взятого из пула.</p>
+
+<p>В основе работы потока все тот же бесконечный цикл и <code>Selector</code> для обеспечения эффективных пауз и обработки сообщений. Внутри <code>process*</code> методов выполняется обработка задач, которые висят в очереди, причем алгоритм работы этих методов идентичен. Различаются только очереди, из которых достаются задачи:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>for (;;) {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>final Runnable task = someQueue.poll();
+</span><span class='line'>if (task == null) {
+</span><span class='line'>    break;
+</span><span class='line'>}
+</span><span class='line'>task.run();
+</span><span class='line'>cleanUpCancelledKeys();
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<blockquote><p>Зачем разведен Copy/Paste в методах обработки очередей, остается загадкой.</p></blockquote>
+
+<p>Задачи реализуют интерфейс <code>Runnable</code>. Метод регистрации регистрирует канал в <code>Selector'е</code> на события чтения/записи наподобие того, как регистрировался канал
+ принятия соединений на события принятия соединений.</p>
+
+<p>Интересен метод обработки ключей, обнаруженных селектором (принцип работы селектора описывался в предыдущей статье):</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void processSelectedKeys(Set&lt;SelectionKey> selectedKeys) throws IOException {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>for (Iterator&lt;SelectionKey&gt; i = selectedKeys.iterator(); i.hasNext();) {
+</span><span class='line'>    SelectionKey k = i.next();
+</span><span class='line'>    i.remove();
+</span><span class='line'>    try {
+</span><span class='line'>        int readyOps = k.readyOps();
+</span><span class='line'>        if ((readyOps &amp; SelectionKey.OP_READ) != 0 || readyOps == 0) {
+</span><span class='line'>            if (!read(k)) {
+</span><span class='line'>                continue;
+</span><span class='line'>            }
+</span><span class='line'>        }
+</span><span class='line'>        if ((readyOps &amp; SelectionKey.OP_WRITE) != 0) {
+</span><span class='line'>            writeFromSelectorLoop(k);
+</span><span class='line'>        }
+</span><span class='line'>    } catch (CancelledKeyException e) {
+</span><span class='line'>        close(k);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>}
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Сразу бросается в глаза интересный способ обхода итератора по ключам селектора. В ключах Nio используется работа с константами на основе битов. Так метод <code>k.readyOps()</code> возвращает бит готовой операции. Сравнение констант производится с помощью побитовых операций. Сообщений в канале по большому счету может быть два - чтение и запись. О них мы поговорим в следующих статьях.</p>
+
+<p>После обработки всех задач выполняется проверка на наличие ключей в селекторе на всякий случай, и если ключи все обработались, то происходит закрытие селектора и прерывание цикла. В случае исключения, как и в Boss потоке, вызывается секундный <code>sleep</code> для предотвращения чрезмерной загрузки процессора в случае сбоев.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Netty: Управление соединениями]]></title>
+    <link href="http://queuepy.com/blog/2012/08/07/netty-connection-management/"/>
+    <updated>2012-08-07T21:35:00+04:00</updated>
+    <id>http://queuepy.com/blog/2012/08/07/netty-connection-management</id>
+    <content type="html"><![CDATA[<p>В прошлых статьях упоминалось, что Netty использует два разных пула потоков для организации соединений и чтения данных. Первый пул - Boss Pool, второй - Worker Pool. Как вы могли уже заметить в предыдущей статье, запуск boss потока выполняется в Sink объекте, внутри метода привязки открытого socket канала к конкретному адресу.</p>
+
+<!--more-->
+
+
+<p>Класс boss потока описан внутри Sink объекта, и новый поток запускается с помощью утилитарных классов и wrapper'ов:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Executor bossExecutor =&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>((NioServerSocketChannelFactory) channel.getFactory()).bossExecutor;
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>DeadLockProofWorker.start(bossExecutor,&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>    new ThreadRenamingRunnable(new Boss(channel),
+</span><span class='line'>            "New I/O server boss #" + id + " (" + channel + ')'));
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p></span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Netty именует потоки для ведения более человеко-понятных логов. Так обертка <code>ThreadRenamingRunnable</code> применяет заданное имя, когда поток запустится.</p>
+
+<p><code>Boss</code> - класс boss потока, который будет отслеживать новые соединения.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Boss(NioServerSocketChannel channel) throws IOException {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>this.channel = channel;
+</span><span class='line'>
+</span><span class='line'>selector = Selector.open();
+</span><span class='line'>
+</span><span class='line'>boolean registered = false;
+</span><span class='line'>try {
+</span><span class='line'>    channel.socket.register(selector, SelectionKey.OP_ACCEPT);
+</span><span class='line'>    registered = true;
+</span><span class='line'>} finally {
+</span><span class='line'>    if (!registered) {
+</span><span class='line'>        closeSelector();
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>channel.selector = selector;
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Во первых, Boss-поток связывается с <em>Netty</em> каналом. Также в конструкторе создается новый экземпляр Nio селектора.</p>
+
+<blockquote><p>Есть прекрасный класс в Nio <code>java.nio.channels.Selector</code>, который позволяет избежать создания большого числа потоков, следя за активностью каналов. Подписавшись на некое событие, можно получить ключи каналов, которые это действие совершили, и дальше уже работать с ними. Отслеживание активности каналов и возвращение только нужных берет на себя <code>Selector</code>. Таким образом, можно работать с несколькими каналами в одном потоке. Но в данном случае, <code>Seletor</code> используется немного для других целей и чуть позже мы увидим для каких именно.</p></blockquote>
+
+<p>Но для начала, необходимо зарегистрировать Nio каналы в селекторе и указать тип активности, за которым необходимо следить. В нашем случае используется <code>SelectionKey.OP_ACCEPT</code> для наблюдения за соединениями. Mетод <code>socket.register</code> выбрасывает <code>IOException</code>, если канал уже закрыт. В данном случае, селектор нам не нужен и его нужно закрыть, но т.к. само исключение пробрасывается выше, используется отдельная переменная для проверки успешности регистрации.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void run() {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>final Thread currentThread = Thread.currentThread();
+</span><span class='line'>
+</span><span class='line'>channel.shutdownLock.lock();
+</span><span class='line'>try {
+</span><span class='line'>    for (;;) {
+</span><span class='line'>        try {
+</span><span class='line'>            if (selector.select(1000) &gt; 0) {
+</span><span class='line'>                selector.selectedKeys().clear();
+</span><span class='line'>            }
+</span><span class='line'>
+</span><span class='line'>            for (;;) {
+</span><span class='line'>                SocketChannel acceptedSocket = channel.socket.accept();
+</span><span class='line'>                if (acceptedSocket == null) {
+</span><span class='line'>                    break;
+</span><span class='line'>                }
+</span><span class='line'>                registerAcceptedChannel(acceptedSocket, currentThread);
+</span><span class='line'>
+</span><span class='line'>            }
+</span><span class='line'>
+</span><span class='line'>        } catch (SocketTimeoutException e) {
+</span><span class='line'>        } catch (CancelledKeyException e) {
+</span><span class='line'>        } catch (ClosedSelectorException e) {
+</span><span class='line'>        } catch (ClosedChannelException e) {
+</span><span class='line'>            break;
+</span><span class='line'>        } catch (Throwable e) {
+</span><span class='line'>            if (logger.isWarnEnabled()) {
+</span><span class='line'>                logger.warn(
+</span><span class='line'>                        "Failed to accept a connection.", e);
+</span><span class='line'>            }
+</span><span class='line'>
+</span><span class='line'>            try {
+</span><span class='line'>                Thread.sleep(1000);
+</span><span class='line'>            } catch (InterruptedException e1) {
+</span><span class='line'>            }
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>} finally {
+</span><span class='line'>    channel.shutdownLock.unlock();
+</span><span class='line'>    closeSelector();
+</span><span class='line'>}
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Основной метод потока вызывает блокировку, используя <code>ReentrantLock</code> канала. Таким образом, один канал будет иметь только один работающий Boss поток в одно и тоже время. Кроме того, <code>ReentrantLock</code> считается более эффективным решением в условиях жесткой конуренции и обладает некоторыми функциональными преимуществами по сравнению с synchronized блоками.</p>
+
+<p>Как это нередко бывает в потоке используются бесконечные циклы для постоянного выполнения. Далее, с помощью селектора прослушиваются каналы на наличие новых соединений. Во время выполнения метода <code>selector.select</code> поток блокируется до тех пор пока не будет получено соединение, либо не будет превышен таймаут. В целях освобождения памяти, ключи, по которым можно было бы получить доступ к Nio каналу, очищаются.</p>
+
+<p>После истечения секунды на ожидание соединения, либо в случае появления этих самых соединений начинает свое выполнение внутренний бесконечный цикл, который принимает все появившиеся соединения без каких-либо задержек. В случае, если селектор был прерван по таймауту и никаких соединений не поступило, то при первом вызове <code>channel.socket.accept()</code> будет возвращен null. Если же соединения присутствуют, то возвращается новый сокет канал, который отправляется в метод <code>registerAcceptedChannel</code> для создания нового worker потока, который будет следить за событиями чтения, записи внутри канала.</p>
+
+<p>Стоит отметить, что в данном <code>Selector'е</code> всегда будет зарегистрирован только один boss канал, поэтому ключи, которые он возвращает Netty не интересуют. <code>Selector</code> в данном контексте - это оптимальный <code>sleep</code> метод, который может прерываться, когда появляется необходимость. Еще стоит обратить внимание, что исключения в основном игнорируются. Работа потока прекращается в случае закрытия канала. Если было выбрашено IOException или, возможно, какое-то Runtime исключение, то поток приостанавливается на секунду и далее продолжает свою работу в нормальном режиме.</p>
+
+<p>В конце выполнения потока, блокировка снимается.</p>
+
+<p>В следующей статье мы рассмотрим как обрабатываются события worker каналов.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Netty: Запуск socket сервера]]></title>
+    <link href="http://queuepy.com/blog/2012/08/04/netty-start-server/"/>
+    <updated>2012-08-04T12:39:00+04:00</updated>
+    <id>http://queuepy.com/blog/2012/08/04/netty-start-server</id>
+    <content type="html"><![CDATA[<p>Как было отмечено ранее, стабильная ветка <a href="http://netty.io/">Netty</a> обладает отличным <a href="http://static.netty.io/3.5/api/">JavaDoc</a>, а более новая четвертая ветка практически не задокументирована. Хочется еще отметить, что в <em>JavaDoc'е</em> <em>Netty</em> используется специальный <em>JavaDoc</em> доклет <a href="http://code.google.com/p/apiviz/">ApiViz</a>, который позволяет отображать связи компонент прямо в документации ввиде графиков. В связи с этим обзор архитектуры будет вестись по 3ей версии. Именно по ней будет изучена терминология проекта, а уже с какими-то знаниями о компонентах системы мы посмотрим на отличия в реализации той или иной фичи в новой четвертой версии <em>Netty</em>.</p>
+
+<!--more-->
+
+
+<p>В качестве отправной точки, будем использовать учебный проект Echo сервера, идущий вместе с исходниками <em>Netty</em>.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ServerBootstrap bootstrap = new ServerBootstrap(&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>new NioServerSocketChannelFactory(
+</span><span class='line'>        Executors.newCachedThreadPool(),
+</span><span class='line'>        Executors.newCachedThreadPool()));
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>bootstrap.setPipelineFactory(new ChannelPipelineFactory() {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>public ChannelPipeline getPipeline() throws Exception {
+</span><span class='line'>    return Channels.pipeline(new EchoServerHandler());
+</span><span class='line'>}
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>});&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;p>bootstrap.bind(new InetSocketAddress(port));</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Запуск сервера начинается с создания объекта helper класса <code>ServerBootstrap</code>. Этот объект позволяет сконфигурировать сервер, наполнить его ключевыми компонентами  и наконец, запустить. В первую очередь необходимо указать фабрику каналов. Каналы представляют собой сетевое соединение и <em>Netty</em> поддерживает несколько их реализаций. Основные из них это соединения использующие:</p>
+
+<ol>
+<li>Old I/O Java package</li>
+<li>New I/O Java package</li>
+</ol>
+
+
+<p>Если первый тип реализации - это скорее пережиток прошлого и нужен лишь для поддержки старых программ, то второй тип - это то, что нам нужно. <code>ChannelFactory</code> можно не задавать в конструкторе <code>ServerBootstrap</code>, а использовать <code>ServerBootstrap#setChannelFactory</code> метод. Setter-метод можно использовать только один раз. Это лишь логическое ограничение, которое проверяется естественно только в runtime'e.</p>
+
+<p><code>NioServerSocketChannelFactory</code> оперирует двумя пулами потоков для создание асинхронных соединений. Пулы можно задать в конструкторе <code>ChannelFactory</code>. В противном случае создаются стандартные кеширующие java пулы:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Executors.newCachedThreadPool()</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Зачем фабрике каналов два пула потоков? Первый из них - boss pool. Создает новые потоки для входящих соединений. Второй же worker pool, обеспечивает потоки для неблокирующих операций записи/чтения.</p>
+
+<p>При создании соединения для канала создается свой pipeline - цепочка обработчиков асинхронных событий каналов. Поэтому <code>ServerBootstrap</code> должен обладать фабрикой pileline'ов. Создавая фабрику pipeline'ов определяются обработчики. В данном случае это один обработчик <code>EchoServerHandler</code>. Удивительно, что без фабрик каналов и pipeline'ов сервер работать не будет, но в архитектуре возможность создания сервера без фабрик есть, т.к. задаются они setter методами.</p>
+
+<p><code>ServerBootstrap#bind</code> запускает сервер, а точнее вешает сервер на определенный адрес. Рассмотрим на данном примере, как запускается <em>NIO Socet Server</em>.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Channel bind(final SocketAddress localAddress) {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>if (localAddress == null) {
+</span><span class='line'>    throw new NullPointerException("localAddress");
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>final BlockingQueue&lt;ChannelFuture&gt; futureQueue = new LinkedBlockingQueue&lt;ChannelFuture&gt;();
+</span><span class='line'>
+</span><span class='line'>ChannelHandler binder = new Binder(localAddress, futureQueue);
+</span><span class='line'>ChannelHandler parentHandler = getParentHandler();
+</span><span class='line'>
+</span><span class='line'>ChannelPipeline bossPipeline = pipeline();
+</span><span class='line'>bossPipeline.addLast("binder", binder);
+</span><span class='line'>if (parentHandler != null) {
+</span><span class='line'>    bossPipeline.addLast("userHandler", parentHandler);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>Channel channel = getFactory().newChannel(bossPipeline);
+</span><span class='line'>
+</span><span class='line'>// Wait until the future is available.
+</span><span class='line'>ChannelFuture future = null;
+</span><span class='line'>boolean interrupted = false;
+</span><span class='line'>do {
+</span><span class='line'>    try {
+</span><span class='line'>        future = futureQueue.poll(Integer.MAX_VALUE, TimeUnit.SECONDS);
+</span><span class='line'>    } catch (InterruptedException e) {
+</span><span class='line'>        interrupted = true;
+</span><span class='line'>    }
+</span><span class='line'>} while (future == null);
+</span><span class='line'>
+</span><span class='line'>if (interrupted) {
+</span><span class='line'>    Thread.currentThread().interrupt();
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>future.awaitUninterruptibly();
+</span><span class='line'>if (!future.isSuccess()) {
+</span><span class='line'>    future.getChannel().close().awaitUninterruptibly();
+</span><span class='line'>    throw new ChannelException("Failed to bind to: " + localAddress, future.getCause());
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>return channel;
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Запуск сервера начинается с открытия нового канала, который создается с помощью фабрики каналов, которую мы засетили. В нашем случае будет создан <code>NioServerSocketChannel</code>. В конструкторе этого канала будет создан Java <code>SocetChannel</code>:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>socket = ServerSocketChannel.open()</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>И если socket открыт удачно, то канал сигнализирует событие об открытии нового канала.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static void fireChannelOpen(Channel channel) {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>if (channel.getParent() != null) {
+</span><span class='line'>    fireChildChannelStateChanged(channel.getParent(), channel);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>channel.getPipeline().sendUpstream(
+</span><span class='line'>        new UpstreamChannelStateEvent(
+</span><span class='line'>                channel, ChannelState.OPEN, Boolean.TRUE));
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Стоит рассказать, что в событийной модели <em>Netty</em> присутствуют два вида сообщений:</p>
+
+<ol>
+<li><em>Upstream</em> - входящие</li>
+<li><em>Downstream</em> - исходящие</li>
+</ol>
+
+
+<p>Все сообщения циркулируют по pipeline. Можно рассматривать pipeline, как цепочку обработчиков событий. Любой обработчик может остановить на себе обработку сообщения. Посыл сообщений происходит соответственно через pipeline.</p>
+
+<p>Канал может быть создан другим каналом. Тот будет для нового канала родительским. Для каналов клиентской стороны родительским каналом будет канал серверной стороны. Входящее сообщение об открытии канала посылается и родительскому каналу, если он есть (метод <code>fireChildChannelStateChanged</code>), и обработчикам данного канала.</p>
+
+<p>Boss-канал, открывающий соединение, на данном этапе кроме открытия сокета и порождения события об этом, ничего не делает и не может делать, так как не обладает нужной для этого информацией. Как же происходит слежение за сообщениями данного канала? Очевидно, что у данного канала должны быть свои обработчики, которые будут ожидать события открытия соединения и в этот момент выполнять всю необходимую для нас работу.</p>
+
+<p>При создании в <code>ServerBootstrap</code> нового сокет канала инициализирует boss pipeline, куда добавляется обязательный обработчик <code>Binder</code> и пользовательский обработчик, который можно задать через метод <code>ServerBootstrap#setParentHandler</code>. Класс обязательного обработчика является внтуренним для класса <code>ServerBootstrap</code>, т.к. является неотъемлемой его частью. В момент получения события об открытии нового socket-канала, <code>Binder</code> получает ссылку на Netty канал из объекта события и задает ему пользовательский <code>PipelineFactory</code>, пользовательские настройки и привязывает открытое соединение к конкретному адресу. По аналогии с Java сокетами, Netty сокеты также обладают методом bind, который привязывает его к конкретному адресу.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static ChannelFuture bind(Channel channel, SocketAddress localAddress) {&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>if (localAddress == null) {
+</span><span class='line'>    throw new NullPointerException("localAddress");
+</span><span class='line'>}
+</span><span class='line'>ChannelFuture future = future(channel);
+</span><span class='line'>channel.getPipeline().sendDownstream(new DownstreamChannelStateEvent(
+</span><span class='line'>        channel, future, ChannelState.BOUND, localAddress));
+</span><span class='line'>return future;
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Асинхронная модель работы <em>Netty</em> основана не тольно на событиях, но также и на Future объектах. Если события обеспечивают работу через callback'и и в данном случае поток, вызвавший операцию, никак не связан с асинхронным процессом, то Future объект предоставляет loop алгоритм, связывая асинхронный вызванный процесс с его родителем. Запуск сервера - как раз такой случай, т.к. этот метод должен вернуть открытый и сконфигурированный канал. Но если до данного момента работа шла в синхронном режиме, то привязка адреса к открытому соединению полноценно открывает сервер для клиентских соединений, запуская соответствующие потоки. Поэтому данный метод возвращает <code>ChannelFuture</code> объект с сылкой на текущий канал и вызывает исходящее событие привязки сервера к адресу.</p>
+
+<p>В методах pipeline'а отправки сообщения происходит некоторое проксирование сообщений, т.к. разные реализации каналов могут работать по разному с разными сообщениями. Очевидно, что проксирование сообщений специфично для разных видов реализаций каналов, поэтому фабрика каналов, помимо типа самих каналов определяет конкретную реализацию проксирующего класса. Проксирующий класс определяет какие сообщения поддерживает канал и возможно даже обрабатывает какие-то из них, которые служат только для внутреннего использования. Такие объекты в <em>Netty</em> именуются <em>Sink</em> объектами. В данном случае обработка события привязки сервера к адресу обрабатывается внутри <code>NioServerSocketPipelineSink</code>:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private void bind(&lt;/p>
+</span><span class='line'>
+</span><span class='line'>&lt;pre>&lt;code>    NioServerSocketChannel channel, ChannelFuture future,
+</span><span class='line'>    SocketAddress localAddress) {
+</span><span class='line'>
+</span><span class='line'>boolean bound = false;
+</span><span class='line'>boolean bossStarted = false;
+</span><span class='line'>try {
+</span><span class='line'>    channel.socket.socket().bind(localAddress, channel.getConfig().getBacklog());
+</span><span class='line'>    bound = true;
+</span><span class='line'>
+</span><span class='line'>    future.setSuccess();
+</span><span class='line'>    fireChannelBound(channel, channel.getLocalAddress());
+</span><span class='line'>
+</span><span class='line'>    Executor bossExecutor =
+</span><span class='line'>        ((NioServerSocketChannelFactory) channel.getFactory()).bossExecutor;
+</span><span class='line'>    DeadLockProofWorker.start(bossExecutor,
+</span><span class='line'>            new ThreadRenamingRunnable(new Boss(channel),
+</span><span class='line'>                    "New I/O server boss #" + id + " (" + channel + ')'));
+</span><span class='line'>    bossStarted = true;
+</span><span class='line'>} catch (Throwable t) {
+</span><span class='line'>    future.setFailure(t);
+</span><span class='line'>    fireExceptionCaught(channel, t);
+</span><span class='line'>} finally {
+</span><span class='line'>    if (!bossStarted &amp;&amp; bound) {
+</span><span class='line'>        close(channel, future);
+</span><span class='line'>    }
+</span><span class='line'>}
+</span><span class='line'>&lt;/code>&lt;/pre>
+</span><span class='line'>
+</span><span class='line'>&lt;p>}</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>В первую очередь вызывается привязка адреса к <em>Java</em> сокету. Далее <code>ChannelFuture</code> переводится в состояние успешного выполнения операции и посылается уже входящее сообщение pipeline'у канала о привязке сервера к адресу. Далее получается пул потоков, который мы передали фабрике каналов и с помощью него запускается boss-поток, который будет следить за соединениями по данному каналу. Теперь наш сервер может принимать соединения и обрабатывать их нашим pipeline'ом.</p>
+
+<p>Т.е. на данном этапе <em>Binder</em> обработчик связал сокет с адресом и осталось оповестить <code>ServerBootstrap</code> о статусе конфигурирования канала и вернуть наружу ссылку на сам канал. Но тут есть две проблемы:</p>
+
+<ol>
+<li>Событийная модель <em>Netty</em> работает в асинхронном режиме, что не дает вернуть напрямую результат работы обработчика</li>
+<li>Так как режим асинхронный, то <code>ServerBootstrap</code> работает в своем пространстве и, если не предпринято каких-то шаманских действий, то вполне возможно уже отработал.</li>
+</ol>
+
+
+<p>А шаманские действия, как вы уже возможно успели заметить, предприняты. В <code>ServerBootstrap</code> до инициализации <em>Binder</em> обработчика создается <code>BlockingQueue</code>, которая передается в <em>Binder</em>. Далее, проинициализировав boss обработчик и создав канал, <code>ServerBootstrap</code> пытается прочитать из очереди <code>ChannelFuture</code>, но так как очередь блокирующая и в ней нет на данный момент сообщений, то поток <code>ServerBootstrap</code> подвешивается пока очередь не будет готова вернуть сообщение.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>future = futureQueue.poll(Integer.MAX_VALUE, TimeUnit.SECONDS);</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Как только <em>Binder</em> сконфигурировал открытый канал, он помещает <code>ChannelFuture</code> объект, который мы ранее рассмотрели в методе <code>bind</code> самого канала, в эту очередь:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>boolean finished = futureQueue.offer(evt.getChannel().bind(localAddress));</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>В этот момент поток выполнения <code>ServerBootstrap</code> оживает и получает это сообщение из очереди и если статус <code>ChannelFuture</code> говорит, что все прошло хорошо, то наружу возвращает ссылка на открытый канал.</p>
+
+<p>Вот так просто и изящно создаются socket соединения в <em>Netty 3.5</em>.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Netty: Структура проекта]]></title>
+    <link href="http://queuepy.com/blog/2012/07/22/netty-common-knowladge/"/>
+    <updated>2012-07-22T10:36:00+04:00</updated>
+    <id>http://queuepy.com/blog/2012/07/22/netty-common-knowladge</id>
+    <content type="html"><![CDATA[<p><a href="http://netty.io">Netty</a> - framework для написания приложений, взаимодействующих по сети. Это может быть и балансировщик нагрузки, и сетевой паук, и практически любая другая архитектура, основанная на понятии client/server.</p>
+
+<!--more-->
+
+
+<p>В основе лежит <code>java.io</code> и <code>java.nio</code>. Выбор базового механизма осуществляется путем использования конкретных реализаций ключевых компонентов. Подход к их использованию скрыт под абстракцией и интерфейсами, так что перейти от одного к другому не составит труда в отличие от того, как бы это было реализовано в <em>Java</em>.</p>
+
+<p>Все сетевые операции асинхронны. Управление асинхронным взаимодействием осуществляется на основе событийной модели или с использованием <em>Future</em> объектов подобных <em>Future</em> объектам в <em>Java</em>.</p>
+
+<p>Workflow типичной программы на Netty:</p>
+
+<ol>
+<li>Создается новый экземпляр <code>ChannelFactory</code> - фабрика, порождающая каналы - базовые сущности библиотеки. Именно они скрывают за собой особенность реализации процесса сетевого взаимодействия. По большому счету, канал - это абстракция над соединением, куда можно писать и откуда можно читать информацию. Очевдно, что реализация <code>ChannelFactory</code> также отражает используемые технологии. Например, для использования java.nio используется <code>NioServerSocketChannelFactory</code>.</li>
+<li>Создается новый экземпляр <code>Bootstrap</code> объекта - вспомогательный класс, который упрощает процесс конфигурирования приложения. Обязательным параметром Bootstrap объекта является <code>ChannelFactory</code>, с помощью которого приложение будет открывать новые сетевые соединения.</li>
+<li>Задается фабрика <code>ChannelPipelineFactory</code>, которая является ключевым элементом в событийной модели <em>Netty</em>. Обработчики событий <code>ChannelHandler</code> организованы подобно обработчикам <em>JUnit</em> или <em>Mockito</em> (возможно, не совсем равноценное сравнение), т.е. каждому методу обработчика соответствует событие. Переопределяя эти методы, мы подписываемся на связанные с ними события. <em>Netty</em> оперирует цепочкой обработчиков <code>ChannelPipeline</code>, т.е. отреагировав на событие, один обработчик передает управление другому обработчику в цепочке. Реализуя фабрику pipeline'ов, мы можем определить свои обработчики в цепочке.</li>
+<li>Второстепенная конфигурация приложения через <code>Bootstrap</code>.</li>
+<li>Запуск сетевого приложения.</li>
+<li>Завершение сетевого приложения.</li>
+</ol>
+
+
+<p><em>Netty</em> потрясающе документирован. Его документация по-настоящему самодостаточна и понятна. Крайне рекомендую изучить примеры использования этой библиотеки в <a href="http://static.netty.io/3.5/guide/">официальной документации проекта</a>. Кстати о версиях. На данный момент, финальная версия - <code>3.5.2</code>. Последний релиз был 5го июля 2012 года. Но вместе с тем идет разработка 4ой версии <em>Netty</em>. К сожалению, эта версия находится в Alpha стадии и не имеет какого либо руководства пользователя. При этом, структура классов немного поменялась, поэтому просто так использовать новую версию не получится.</p>
+
+<p>Исходные коды хостятся на <a href="https://github.com/netty/netty">Github</a>. В качестве build tool используется <em>Maven</em>. Проект организован в виде нескольких модулей. Т.е. внутри корневого пакета <code>io.netty</code> пакеты разделены на модули. Каждый модуль находится в отдельном каталоге, который реализован также ввиде maven проекта. Внутри центрального pom файла объявляются все дочерние модули:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>&lt;modules>
+</span><span class='line'>  &lt;module>common&lt;/module> - утилитарные классы + логирование
+</span><span class='line'>  &lt;module>buffer&lt;/module> - базовая структура данных и все, что требуется для ее работы
+</span><span class='line'>  &lt;module>codec&lt;/module> - реализации обработчиков, преобразующие данные в цепочке обработки
+</span><span class='line'>  &lt;module>codec-http&lt;/module> - реализация обработчиков и утилитарных методов, специфичных для взаимодействия поверх HTTP
+</span><span class='line'>  &lt;module>transport&lt;/module> - ядро &lt;em>Netty&lt;/em>, управляющее передачей данных и соединением (Bootstrap, Channel, ChannelHandler)
+</span><span class='line'>  &lt;module>handler&lt;/module> - утилитарные классы, необходимые для работы обработчиков
+</span><span class='line'>  &lt;module>example&lt;/module> - примеры программ, использующих &lt;em>Netty&lt;/em>
+</span><span class='line'>  &lt;module>testsuite&lt;/module> - тесты на &lt;em>JUnit&lt;/em>. Тестов немного, но они есть.
+</span><span class='line'>  &lt;module>all&lt;/module> - сборка всех модулей в один jar'файл
+</span><span class='line'>  &lt;module>tarball&lt;/module> - сборка в tarball архив
+</span><span class='line'>&lt;/modules></span></code></pre></td></tr></table></div></figure></notextile></div></p>
+]]></content>
+  </entry>
+  
+</feed>

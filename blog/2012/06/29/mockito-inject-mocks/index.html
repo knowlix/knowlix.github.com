@@ -1,0 +1,709 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Mockito: @InjectMocks -  Queuepy</title>
+  <meta name="author" content="Evgenij Kozhevnikov">
+
+  
+  <meta name="description" content=" Обзоры архитектурных решений Open Source проектов ">
+  <meta name="keywords" content=" code review, open source, обзор проектов, JVM ">
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <meta http-equiv="cache-control" content="max-age=0" />
+  <meta http-equiv="cache-control" content="no-cache" />
+  <meta http-equiv="expires" content="0" />
+  <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
+  <meta http-equiv="pragma" content="no-cache" />
+
+  
+  <link rel="canonical" href="http://queuepy.com/blog/2012/06/29/mockito-inject-mocks/">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <script src="/javascripts/audiojs/audio.min.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="Queuepy" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-17465176-1']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<h3 class="main-logo"><a href="/">Queuepy</a></h3>
+
+<ul class="main-navigation">
+  <li><a href="/">Code reviews</a></li>
+  <li><a href="/blog/archives">Archive</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Mockito: @InjectMocks</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-06-29T00:33:00+04:00" pubdate data-updated="true">00:33 29.06.2012</time>
+        
+         | <a href="#disqus_thread">Комментарии</a>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Процесс внедрения mock&#8217;ов разделен на несколько этапов:</p>
+
+
+
+
+<ol class="enum">
+    <li>Поиск полей, отмеченных аннотацией <code>@InjectMocks</code></li>
+    <li>Поиск мок объектов в тесте</li>
+    <li>Внедрение найденных моков в поля, помеченные аннотацией <code>@InjectMocks</code></li>
+</ol>
+
+
+
+
+<!--more-->
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>Set&lt;Field> mockDependentFields = new HashSet&lt;Field>();
+</span><span class='line'>Set&lt;Object> mocks = newMockSafeHashSet();
+</span><span class='line'>        
+</span><span class='line'>while (clazz != Object.class) {
+</span><span class='line'>    new InjectMocksScanner(clazz).addTo(mockDependentFields);
+</span><span class='line'>    new MockScanner(testClassInstance, clazz).addPreparedMocks(mocks);
+</span><span class='line'>    clazz = clazz.getSuperclass();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>В <a href="https://code.google.com/p/mockito/" rel="nofollow">Mockito</a> используется собственный утилитарный класс <code>Sets</code>, с помощью которого создаются внутренние реализации множеств. В данном случае заимпортирован один из его статичных методов newMockSafeHashSet. Метод создает реализацию под названием <code>org.mockito.internal.util.collections.HashCodeAndEqualsSafeSet</code>. Создана отдельная реализация <code>Set</code> интерфейса лишь для того, чтобы скрыть особенность реализации моков. А именно, есть некоторая проблема в стаббинге методов <code>Object.equals</code> и <code>Object.hashCode</code>, и они могут выкидывать <code>NullPointerException</code>. Истинную причину выясним при разборе процесса subbing&#8217;а. При работе в коллекциях эти методы интенсивно используются при поиске и добавлении элементов, поэтому мы оборачиваем мок объект в этот wrapper, который использует свои методы <code>equals</code> и <code>hashCode</code>. Оборачивание моков происходит в момент добавления элементов в множество.</p>
+
+
+
+
+<p>Вернемся к примеру. В множество mocks у нас будут добавлены все найденные mock-объекты. Стоит заметить, что в Mockito много переменных модифицируются, будучи переданными через аргументы. Так и в данном случае коллекции наполяются именно так. Immutability здесь явно не хватает. <code>org.mockito.internal.configuration.injection.scanner.InjectMocksScanner</code> реализует алгоритм поиска полей, отмеченных аннотацией <code>@InjectMocks</code>. Основные два метода класса:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private Set&lt;Field> scan() {
+</span><span class='line'>    Set&lt;Field> mockDependentFields = new HashSet&lt;Field>();
+</span><span class='line'>    Field[] fields = clazz.getDeclaredFields();
+</span><span class='line'>    for (Field field : fields) {
+</span><span class='line'>        if (null != field.getAnnotation(InjectMocks.class)) {
+</span><span class='line'>            assertNoAnnotations(field, Mock.class, MockitoAnnotations.Mock.class, Captor.class);
+</span><span class='line'>            mockDependentFields.add(field);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    return mockDependentFields;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>void assertNoAnnotations(final Field field, final Class... annotations) {
+</span><span class='line'>    for (Class annotation : annotations) {
+</span><span class='line'>        if (field.isAnnotationPresent(annotation)) {
+</span><span class='line'>            new Reporter().unsupportedCombinationOfAnnotations(annotation.getSimpleName(), InjectMocks.class.getSimpleName());
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Именно результат метода scan и добавляет в наше множество. В цикле пробегаем по полям класса-теста, проверяем есть ли у поля аннотация <code>@InjectMocks</code>. Стоит отметить, что используются системные java классы полей и классов. Пока, по-моему, ничего сверхъестественного. Далее, если метод аннотирован, то проверяем не аннотирован ли он еще и стаббирующими аннотациями (<code>@Mock</code>, <code>@Captor</code>), т.к. это противоречит логике и не может быть допущено. В случае нарушения правил выбрасывается <code>RuntimeException</code>. Если все в порядке, то мы можем добавить поле в наше множество.</p>
+
+
+
+
+<p><code>org.mockito.internal.configuration.injection.scanner.MockScanner</code> реализуется второй этап алгоритма внедрения моков - поиск мок объектов в тесте. Основные методы класса:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private Set&lt;Object> scan() {
+</span><span class='line'>    Set&lt;Object> mocks = newMockSafeHashSet();
+</span><span class='line'>    for (Field field : clazz.getDeclaredFields()) {
+</span><span class='line'>        // mock or spies only
+</span><span class='line'>        FieldReader fieldReader = new FieldReader(instance, field);
+</span><span class='line'>
+</span><span class='line'>        Object mockInstance = preparedMock(fieldReader.read(), field);
+</span><span class='line'>        if (mockInstance != null) {
+</span><span class='line'>            mocks.add(mockInstance);
+</span><span class='line'>        }
+</span><span class='line'>    }
+</span><span class='line'>    return mocks;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private Object preparedMock(Object instance, Field field) {
+</span><span class='line'>    if (isAnnotatedByMockOrSpy(field)) {
+</span><span class='line'>        return instance;
+</span><span class='line'>    } else if (isMockOrSpy(instance)) {
+</span><span class='line'>        mockUtil.maybeRedefineMockName(instance, field.getName());
+</span><span class='line'>        return instance;
+</span><span class='line'>    }
+</span><span class='line'>    return null;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private boolean isAnnotatedByMockOrSpy(Field field) {
+</span><span class='line'>    return null != field.getAnnotation(Spy.class)
+</span><span class='line'>            || null != field.getAnnotation(Mock.class)
+</span><span class='line'>            || null != field.getAnnotation(MockitoAnnotations.Mock.class);
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>private boolean isMockOrSpy(Object instance) {
+</span><span class='line'>    return mockUtil.isMock(instance)
+</span><span class='line'>            || mockUtil.isSpy(instance);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>Класс выполнен в стиле <code>InjectMocksScanner</code>, хотя общего интерфейса у классов нет. Но это не страшно, т.к. выполняют они сугубо утилитарные функции. Результат метода scan помещается в множество найденных мок объектов для внедрения. За чтение значений полей класса из конкретных объектов отвечает FieldReader. Основная строчка его метода read:</p>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>return field.get(target)</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<p>В методе <code>MockScanner#preparedMock</code> определяется, является ли полученный из поля объект mock&#8217;ом. Определяется он по наличию в поле аннотаций <code>@Mock</code> или <code>@Spy</code>. Если аннотаций нет, то есть вероятность, что объекты были стаббированы вручную. Это проверяется в методе <code>MockScanner#isMockOrSpy</code>. В случае, если объект все-таки является <em>Mock</em> объектом, то возможно требуется его переименование. Необходимость такого решения возможно выяснится позднее, когда мы разберем процесс создания <em>Mock</em> объектов. На данный момент это выглядит каким то костылем.
+
+<p>Осталось дело за малым - внедрить мок-объекты. Отправная точка <code>org.mockito.internal.configuration#DefaultInjectionEngine</code> - объект, который инициализирует обработчиков-внедренцев. И запускает процесс инжектирования. Внедрением занимаются <code>org.mockito.internal.configuration.injection.MockInjectionStrategy</code> объекты. На данный момент моки инжектируются через конструктор (<code>ConstructorInjection</code>), поля класса и сеттеры (<code>PropertyAndSetterInjection</code>).</p>
+
+<blockquote>
+    Поле, помеченное аннотацией @InjectMocks, может быть помечено ещё и аннотацией @Spy, что заставляет, в случае неуспешного внедрения моков в объект, создавать из него Spy-объект. Хотя в целом JavaDoc полный, этот факт скрыт от глаз пользователей.
+</blockquote>
+
+<p>Для обработки <code>@Spy</code> аннотации, если не получилось создать объект, в который внедрялись моки, используется <code>SpyOnInjectedFieldsHandler</code>. Основной метод <code>DefaultInjectionEngine</code> - <code>#injectMocksOnFields</code>:
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public void injectMocksOnFields(Set&lt;Field> needingInjection, Set&lt;Object> mocks, Object testClassInstance) {
+</span><span class='line'>    MockInjection.onFields(needingInjection, testClassInstance)
+</span><span class='line'>            .withMocks(mocks)
+</span><span class='line'>            .tryConstructorInjection()
+</span><span class='line'>            .tryPropertyOrFieldInjection()
+</span><span class='line'>            .handleSpyAnnotation()
+</span><span class='line'>            .apply();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Как видно, объект-конфигуратор процесса внедрения - <code>org.mockito.internal.configuration.injection.MockInjection</code>. Он определяет внутри себя реализации той или иной стратегии. Поэтому его методы <code>tryConstructorInjection</code>, <code>tryPropertyOrFieldInjection</code> и <code>handleSpyAnnotation</code> возвращают именно те классы стратегий, которые мы рассмотрели выше. Метод <code>onFields</code> возвращает объект <code>OngoingMockInjection</code> - внутренний класс класса <code>MockInjection</code>. Его тип нас не должен интересовать, т.к. проектировался этот объект для использования здесь и сейчас в виде Builder&#8217;а, что обеспечивается возвращением из каждого его метода ссылки на самого себя. Этот объект-builder сохраняет в конструкторе поля с аннотацией <code>@InjectMocks</code>. Далее метод withMocks сохраняет список mock объектов. Странный подход к инициализации базовых данных. Практичнее было бы внести сохранение списка mock объектов в конструктор, т.к. инжектирование без них смысла не имеет. А так как порядок выполнения Builder методов не регулируется, то можно пропустить этот метод. Далее 3&#8217;мя следующими методами объявляем стратегии инжектирования, которые хотим использовать. Стратегии инжектирования образуют цепочку стратегий по примеру паттерна Composite. Вызывая основной метод первого из них, он обрабатывает основную логику, затем вызывается аналогичный метод связанного с ним объекта-внедренца. И так до последнего. На практике это реализуется следующим образом:</p>
+ 
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private MockInjectionStrategy injectionStrategies = MockInjectionStrategy.nop();</span></code></pre></td></tr></table></div></figure>
+
+ 
+<p>В <code>OngoingMockInjection</code> создается поле с пустой стратегией обработчиком, где nop() - фабричный метод возвращающий пустую реализацию:</p>
+ 
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public static final MockInjectionStrategy nop() {
+</span><span class='line'>    return new MockInjectionStrategy() {
+</span><span class='line'>        protected boolean processInjection(Field field, Object fieldOwner, Set&lt;Object> mockCandidates) {
+</span><span class='line'>            return false;
+</span><span class='line'>        }
+</span><span class='line'>    };
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+    
+<p><code>processInjection</code> - основной абстрактный метод MockInjectionStrategy, в котором определяется логика внедрения моков. Методы добавления следующего в цепочке обработчика выглядят следующим образом:</p>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public OngoingMockInjection tryConstructorInjection() {
+</span><span class='line'>    injectionStrategies.thenTry(new ConstructorInjection());
+</span><span class='line'>    return this;
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>public OngoingMockInjection tryPropertyOrFieldInjection() {
+</span><span class='line'>    injectionStrategies.thenTry(new PropertyAndSetterInjection());
+</span><span class='line'>    return this;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Где метод <code>thenTry</code> передает добавляемый объект следующему в цепочке объекту, пока не будет достигнут последний объект в цепочке. Он то и примет к себе новое звено:</p>
+    
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public MockInjectionStrategy thenTry(MockInjectionStrategy strategy) {
+</span><span class='line'>    if(nextStrategy != null) {
+</span><span class='line'>        nextStrategy.thenTry(strategy);
+</span><span class='line'>    } else {
+</span><span class='line'>        nextStrategy = strategy;
+</span><span class='line'>    }
+</span><span class='line'>    return strategy;
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Метод <code>OngoingMockInjection#apply</code>, который завершает цепочку методов Builder&#8217;а, выполняет метод injectionStrategies.process, первого из цепочки стратегий обработки объекта для каждого поля, аннотированного <code>@InjectMocks</code>:</p>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public boolean process(Field onField, Object fieldOwnedBy, Set&lt;Object> mockCandidates) {
+</span><span class='line'>    if(processInjection(onField, fieldOwnedBy, mockCandidates)) {
+</span><span class='line'>        return true;
+</span><span class='line'>    }
+</span><span class='line'>    return relayProcessToNextStrategy(onField, fieldOwnedBy, mockCandidates);
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+    
+<p>Где осуществляется вызов метода с логикой обработки, а затем в методе relayProcessToNextStrategy передается управление следующему объекту в цепи.</p>
+
+<p>Метод <code>OngoingMockInjection#handleSpyAnnotation</code> прикрепляет финальный обработчик <code>@Spy</code> аннотаций в другой <code>MockInjectionStrategy#nop()</code>, который также вызывается для каждого поля в методе apply после вызова цепочки стратегий внедрения.</p>
+
+<p>Рассмотрим алгоритм внедрения через конструктор:</p>
+
+<p>ConstructorInjection определяет внутри себя реализацию ConstructorArgumentResolver&#8217;а, где определяется алгоритм получения mock&#8217;ов из найденного заранее множества, которые могут быть приравнены к типам аргументов конструктора.</p>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>public Object[] resolveTypeInstances(Class&lt;?>... argTypes) {
+</span><span class='line'>    List&lt;Object> argumentInstances = new ArrayList&lt;Object>(argTypes.length);
+</span><span class='line'>    for (Class&lt;?> argType : argTypes) {
+</span><span class='line'>        argumentInstances.add(objectThatIsAssignableFrom(argType));
+</span><span class='line'>    }
+</span><span class='line'>    return argumentInstances.toArray();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+        
+<p>Где метод objectThatIsAssignableFrom перебирает множество mock объектов и ищет первое из них, которое удовлетворяет условию:</p>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>argType.isAssignableFrom(mock.getClass())</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Выбор конструктора, определение его параметров и создание нового экземпляра класса для поля, аннотированного <code>@InjectMocks</code>, осуществляется в классе <code>org.mockito.internal.util.reflection.FieldInitializer</code>. Внутри определены две реализации <code>ConstructorInstantiator</code> для обработки - конструктор с параметрами и без параметров. В ConstructorInjection используется <code>ParameterizedConstructorInstantiator</code>, так как внедрение mock объектов в конструктор без параметров смысла не имеет. Соответственно, первое что делается - это проверка - не создан ли объект в целевом поле.</p>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>private FieldInitializationReport acquireFieldInstance() throws IllegalAccessException {
+</span><span class='line'>    Object fieldInstance = field.get(fieldOwner);
+</span><span class='line'>    if(fieldInstance != null) {
+</span><span class='line'>        return new FieldInitializationReport(fieldInstance, false, false);
+</span><span class='line'>    }
+</span><span class='line'>
+</span><span class='line'>    return instantiator.instantiate();
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Значение объекта получается уже знакомым способом через метод get. Если объект уже в поле создан, то нет смысла идти дальше - возвращаем результат о неуспешном создании объекта. <code>FieldInitializationReport</code> - класс с данными результатов создания класса. <code>instantiator</code> - это и есть один из экземпляров <code>ConstructorInstantiator</code>. По методу <code>instantiate</code> выполняется основная логика поиска соответствующего конструктора и создания самого объекта. Основное содержание метода:</p>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>constructor = biggestConstructor(field.getType());
+</span><span class='line'>changer.enableAccess(constructor);
+</span><span class='line'>
+</span><span class='line'>final Object[] args = argResolver.resolveTypeInstances(constructor.getParameterTypes());
+</span><span class='line'>Object newFieldInstance = constructor.newInstance(args);
+</span><span class='line'>new FieldSetter(testClass, field).set(newFieldInstance);
+</span><span class='line'>
+</span><span class='line'>return new FieldInitializationReport(field.get(testClass), false, true);</span></code></pre></td></tr></table></div></figure>
+
+    
+<p>С помощью метода <code>biggestConstructor</code> (кстати, неудачное название, т.к. не отражает действия) определяется конструктор с наибольшим количеством параметров. Реализация тривиальна.</p>
+
+<p>С помощью метода changer.enableAccess изменяем доступность конструктора:</p>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>constructor.setAccessible(true);</span></code></pre></td></tr></table></div></figure>
+
+
+<p>При этом сохраняем старое значение accesible, чтобы вернуть его в конце метода в блоке finally:</p>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>finally {
+</span><span class='line'>    if(constructor != null) {
+</span><span class='line'>        changer.safelyDisableAccess(constructor);
+</span><span class='line'>    }
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p><code>argResolver</code> - реализация <code>ConstructorArgumentResolver</code>, которая определяется внутри <code>ConstructorInjection</code> (о нем мы говорили выше). С помощью него мы получаем массив mock объектов в нужном нам порядке и создаем с помощью них новый экземпляр класса целевого поля. <code>FieldSetter</code> - противоположность <code>FieldReader'а</code>. Вставляет значение в поле, при этом также меняя видимость поля. В конце возвращается <code>FieldInitializationReport</code> с отчетом об успешном создании объекта. В дальнейшем из этого объекта получится флаг <code>fieldWasInitializedUsingContructorArgs</code>,и если он равен <code>true</code>, то вызов следующих обработчиков в цепочке прекращается.</p>
+
+<p>Остальные обработчики работают по такому же принципу. Так что нет особого смысла их детально рассматривать.</p>
+
+<p>На этом рассмотрение аннотаций заканчивается. В комментариях отвечу на любые вопросы.</p>
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Evgenij Kozhevnikov</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-06-29T00:33:00+04:00" pubdate data-updated="true">00:33 29.06.2012</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/mockito/'>Mockito</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://queuepy.com/blog/2012/06/29/mockito-inject-mocks/" data-via="queuepy" data-counturl="http://queuepy.com/blog/2012/06/29/mockito-inject-mocks/" >Tweet</a>
+  
+  
+  <div class="g-plusone" data-size="medium"></div>
+  
+  
+    <div class="fb-like" data-send="true" data-width="450" data-show-faces="false"></div>
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2012/06/26/mockito-init-mocks/" title="Previous Post: Mockito: Обработка аннотаций">&laquo; Mockito: Обработка аннотаций</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2012/06/30/mockito-mocks-creating/" title="Next Post: Mockito: Как создаются mock'и">Mockito: Как создаются mock'и &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2013/03/03/scribe-oauth-library/">Прицельный обзор: OAuth вне браузера через Scribe</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/09/09/netty-start-server-4/">Netty 4.0: Запуск сервера</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/08/24/metrics-reporting/">Прицельный обзор: Reporter'ы в библиотеке Metrics</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/08/15/netty-message-management/">Netty: Управление сообщениями</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/08/10/podcast-3/">Подкаст: Третий выпуск</a>
+      </li>
+    
+  </ul>
+</section>
+
+
+<section>
+  <h1>Latest Tweets</h1>
+  <ul id="tweets">
+    <li class="loading">Status updating...</li>
+  </ul>
+  <script type="text/javascript">
+    $.domReady(function(){
+      getTwitterFeed("queuepy", 4, false);
+    });
+  </script>
+  <script src="/javascripts/twitter.js" type="text/javascript"> </script>
+  
+    <a href="http://twitter.com/queuepy" class="twitter-follow-button" data-show-count="false">Follow @queuepy</a>
+  
+</section>
+
+
+
+<section class="googleplus">
+  <h1>
+    <a href="https://plus.google.com/106854167863011611466?rel=author">
+      <img src="http://www.google.com/images/icons/ui/gprofile_button-32.png" width="32" height="32">
+      Google+
+    </a>
+  </h1>
+</section>
+
+
+<section>
+  <h1>Поддержать проект</h1>
+  
+  <p style="margin: 10px -10px;"><iframe frameborder="0" allowtransparency="true" scrolling="no" src="https://money.yandex.ru/embed/small.xml?uid=41001821062196&amp;button-text=01&amp;button-size=m&amp;button-color=white&amp;targets=%d0%9f%d0%be%d0%b4%d0%b4%d0%b5%d1%80%d0%b6%d0%ba%d0%b0+%d0%bf%d1%80%d0%be%d0%b5%d0%ba%d1%82%d0%b0+queuepy.com&amp;default-sum=100&amp;mail=on" width="200px" height="42"></iframe></p>
+</section>
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p style="float: left; margin-bottom: 0;">
+  Copyright &copy; 2013 - Queuepy.com
+</p>
+<p style="float: right"><a href="mailto:support@queuepy.com">Напишите мне</a></p>
+
+</footer>
+  <script type="text/javascript">
+  audiojs.events.ready(function() {
+    var as = audiojs.createAll();
+  });
+</script>
+
+
+<script type="text/javascript">
+      var disqus_shortname = 'queuepy';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://queuepy.com/blog/2012/06/29/mockito-inject-mocks/';
+        var disqus_url = 'http://queuepy.com/blog/2012/06/29/mockito-inject-mocks/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+<div id="fb-root"></div>
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) {return;}
+  js = d.createElement(s); js.id = id;
+  js.src = "//connect.facebook.net/en_US/all.js#appId=212934732101925&xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+
+
+
+  <script type="text/javascript">
+    (function() {
+      var script = document.createElement('script'); script.type = 'text/javascript'; script.async = true;
+      script.src = 'https://apis.google.com/js/plusone.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(script, s);
+    })();
+  </script>
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>
